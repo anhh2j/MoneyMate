@@ -7,7 +7,15 @@ grep -q 'Status: ok' build/reports/emulator/launch.txt
 for attempt in $(seq 1 20); do
     adb shell uiautomator dump /sdcard/window.xml >/dev/null
     adb pull /sdcard/window.xml build/reports/emulator/window.xml >/dev/null
-    if grep -q 'text="MoneyMate"' build/reports/emulator/window.xml; then
+    if python3 - build/reports/emulator/window.xml <<'PYTHON'
+import sys
+import xml.etree.ElementTree as ET
+nodes = ET.parse(sys.argv[1]).getroot().iter()
+visible = any(node.get("text") == "MoneyMate" and node.get("package") == "com.app.moneymate" for node in nodes)
+sys.exit(0 if visible else 1)
+PYTHON
+    then
+        adb shell dumpsys activity activities > build/reports/emulator/activities.txt
         adb exec-out screencap -p > build/reports/emulator/screen.png
         echo 'PASS: APK installed, launcher opened, MoneyMate text visible' | tee build/reports/emulator/result.txt
         exit 0

@@ -18,9 +18,9 @@ Quy tắc cạnh trực tiếp:
 - parser/dedup/categorizer/capture/data → core-model.
 - core-model/privacy/security chưa phụ thuộc module nào.
 
-`verifyModuleGraph` so sánh chính xác tập module và cạnh ProjectDependency với bảng trên. Đồ thị này không có chu trình. Ba module thuật toán chỉ thêm test dependency JUnit; không có plugin hoặc dependency Android. Đổi cạnh sau T00 cần ADR/brief tương ứng.
+`verifyModuleGraph` so sánh chính xác tập module và cạnh ProjectDependency với bảng trên. Đồ thị này không có chu trình. Các cạnh self-reference do AGP tự sinh trong UnitTest/AndroidTest CompileClasspath/RuntimeClasspath được loại khỏi tập cạnh kiến trúc; self-dependency trong cấu hình khai báo vẫn bị chặn. Ba module thuật toán chỉ thêm test dependency JUnit; không có plugin hoặc dependency Android. Đổi cạnh sau T00 cần ADR/brief tương ứng.
 
-JDK 17, Gradle wrapper 9.8.1, AGP 9.4.0 và Kotlin 2.4.21; Android dùng built-in Kotlin của AGP (KGP phiên bản cao hơn được khai báo qua plugin JVM/Compose). SDK 37, Build Tools theo AGP, minSdk 26. Không dùng QPR beta. AndroidX core thêm permission signature nội bộ `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` vào manifest qua dependency. T00 chưa có dynamic receiver nên manifest app gỡ đúng hai node khai báo/sử dụng permission này bằng manifest-merger, giữ APK khung không có uses-permission. Không dùng removeAll để che quyền không mong muốn từ dependency khác; CI kiểm merged manifests cả debug/release. Khi task sau cần dynamic receiver qua ContextCompat, phải review lại cơ chế receiver isolation và quyền nội bộ trong phạm vi task đó. Phiên bản được pin trong version catalog; Gradle distribution và checksum pin trong wrapper.
+JDK 17, Gradle wrapper 9.8.1, AGP 9.4.1 và Kotlin 2.4.21; Android dùng built-in Kotlin của AGP (KGP phiên bản cao hơn được khai báo qua plugin JVM/Compose). SDK 37, Build Tools theo AGP, minSdk 26. Không dùng QPR beta. AndroidX core thêm permission signature nội bộ `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` vào manifest qua dependency. T00 chưa có dynamic receiver nên manifest app gỡ đúng hai node khai báo/sử dụng permission này bằng manifest-merger, giữ APK khung không có uses-permission. Không dùng removeAll để che quyền không mong muốn từ dependency khác; CI kiểm merged manifests cả debug/release. Khi task sau cần dynamic receiver qua ContextCompat, phải review lại cơ chế receiver isolation và quyền nội bộ trong phạm vi task đó. Phiên bản được pin trong version catalog; Gradle distribution và checksum pin trong wrapper.
 
 ktlint CLI và detekt CLI chạy trong JavaExec riêng, tránh phụ thuộc Gradle plugin của chúng vào API AGP/Gradle. Không trộn runtime Kotlin của detekt với runtime compiler của ứng dụng. ktlint quét toàn bộ Kotlin/build scripts; detekt quét source/test .kt (build scripts được ktlint kiểm), dùng default config cộng maxIssues=0, validate config và baseline rỗng. Android lint coi warning là lỗi.
 
@@ -42,6 +42,7 @@ CI chạy `ktlintCheck detekt test assembleDebug`, Android lint, kiểm graph, d
 
 Nguồn kiểm tra phiên bản tại ngày thực hiện:
 
+- https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/maven-metadata.xml (stable patch 9.4.1)
 - https://developer.android.com/build/releases/agp-9-4-0-release-notes
 - https://developer.android.com/about/versions/17/setup-sdk
 - https://github.com/gradle/gradle/releases/tag/v9.8.1
