@@ -108,13 +108,18 @@ tasks.register("verifyModuleGraph") {
         subprojects.forEach { module ->
             val actual =
                 module.configurations
-                    .flatMap { it.dependencies.withType<ProjectDependency>() }
-                    .map { it.name }
+                    .flatMap { configuration ->
+                        // AGP wires the module under test into its own generated test classpaths.
+                        configuration.dependencies.withType<ProjectDependency>().filterNot { dependency ->
+                            dependency.name == module.name &&
+                                configuration.name.matches(Regex(".*(AndroidTest|UnitTest)(CompileClasspath|RuntimeClasspath)"))
+                        }
+                    }.map { it.name }
                     .toSet()
             check(actual == moduleEdges.getValue(module.name)) {
                 "${module.path}: expected ${moduleEdges[module.name]}, got $actual"
             }
         }
-        println("PASS: exact T00 module graph; all edges terminate at core-model, no cycles")
+        println("PASS: exact T00 module graph; no cycles")
     }
 }
