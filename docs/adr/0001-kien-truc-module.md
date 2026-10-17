@@ -42,7 +42,7 @@ CI chạy `ktlintCheck detekt test assembleDebug`, Android lint, kiểm graph, d
 
 Nguồn kiểm tra phiên bản tại ngày thực hiện:
 
-- https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/maven-metadata.xml (stable patch 9.4.1)
+- https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/maven-metadata.xml (artifact 9.4.1 đã được đăng; xem BLOCKER bên dưới)
 - https://developer.android.com/build/releases/agp-9-4-0-release-notes
 - https://developer.android.com/about/versions/17/setup-sdk
 - https://github.com/gradle/gradle/releases/tag/v9.8.1
@@ -52,3 +52,47 @@ Nguồn kiểm tra phiên bản tại ngày thực hiện:
 - https://github.com/ktlint/ktlint/releases/tag/1.8.0
 - https://github.com/detekt/detekt/releases/tag/v1.23.8
 - https://www.jacoco.org/jacoco/trunk/doc/changes.html
+
+## Bổ sung sau Leader review tại commit 68f3b6b
+
+### Khôi phục permission helper của AndroidX
+
+Việc gỡ `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` chỉ áp dụng cho khung T00 chưa có dynamic receiver. T08 (SMS receiver), hoặc bất kỳ task nào khác, phải kiểm tra lại trước khi dùng `ContextCompat.registerReceiver(..., RECEIVER_NOT_EXPORTED)` hay cơ chế đăng ký receiver không export có đường fallback dùng permission signature trên Android 26–32. Không suy ra rằng mọi SMS receiver đều cần helper này: phải đối chiếu cách đăng ký và code AndroidX thực tế.
+
+Nếu đường code được thêm cần helper, trong cùng task phải gỡ hai marker `tools:node="remove"` tương ứng trong manifest app để AndroidX đóng góp lại cả khai báo `<permission>` signature và `<uses-permission>`. Đồng thời cập nhật có chủ đích kiểm tra manifest đang yêu cầu zero uses-permission, chỉ cho phép permission nội bộ đã duyệt, vẫn chặn INTERNET/quyền ngoài brief; bổ sung test trên phiên bản Android chịu ảnh hưởng. Không tự khôi phục quyền ở T00 khi chưa có consumer.
+
+### AGP 9.4.1 — bằng chứng và BLOCKER R3.3-2
+
+Ngày kiểm tra: 2026-10-17. [Trang phát hành chính thức AGP 9.4](https://developer.android.com/build/releases/agp-9-4-0-release-notes?hl=en) hiện có tiêu đề 9.4.0; xác nhận dòng 9.4 hỗ trợ tối đa API 37, Gradle tối thiểu 9.6.0 và JDK 17. Trang này không có mục 9.4.1 trong nội dung đã truy xuất. URL riêng `https://developer.android.com/build/releases/agp-9-4-1-release-notes?hl=en` trả HTTP 404 khi kiểm tra.
+
+[Metadata Google Maven chính thức](https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/maven-metadata.xml) liệt kê artifact 9.4.1. Đây là bằng chứng artifact đã được đăng, không được ghi thành bằng chứng độc lập rằng có trang phát hành xác nhận stable. Lượt CI trước cũng phát hiện 9.4.1 là bản mới hơn qua Android lint, nhưng chưa thay thế được loại nguồn Leader yêu cầu.
+
+**BLOCKER R3.3-2:** chưa tìm được trang phát hành chính thức ghi rõ patch 9.4.1 stable. Giữ nguyên catalog 9.4.1 đã được dùng trong commit được review; không đổi phiên bản công cụ hay tuyên bố mục này đã đóng. Cần Leader cung cấp nguồn đáp ứng yêu cầu, hoặc xác nhận loại bằng chứng bổ sung được chấp nhận. Các phần sửa khác có thể được kiểm chứng độc lập; PR chưa đủ điều kiện merge khi BLOCKER còn mở.
+
+### Phạm vi kiểm chứng targetSdk
+
+Ứng dụng compileSdk/targetSdk 37 nhưng bằng chứng chạy thực tế hiện chỉ trên emulator API 35. Build với SDK 37 không chứng minh hành vi runtime trên API 36/37. Đây là rủi ro tương thích đã biết, để kiểm trên máy thật phù hợp hoặc trong T17; T00 không tự mở rộng ma trận emulator hay tuyên bố đã kiểm các API đó.
+
+### Duy trì đồ thị chính xác tại T03 và T20
+
+`verifyModuleGraph` so sánh tập cạnh chính xác, không chỉ phát hiện chu trình. Khi T03 hoặc T20 thêm dependency hợp lệ theo brief, chính task đó phải cập nhật bảng cạnh `moduleEdges` và ADR tương ứng, chạy lại kiểm graph và kiểm độc lập Android cho các module thuật toán. Không tắt task, bỏ cạnh khỏi việc kiểm hoặc đổi sang kiểm lỏng để làm CI xanh. T00 giữ nguyên đồ thị hiện tại.
+
+### Tính tạm thời của resource smoke test
+
+Các file `src/main/resources/moneymate/*.properties` chỉ là tài nguyên tạm để smoke test kiểm được đóng gói module và liên kết classpath khi chưa có production class. Chúng không phải dữ liệu nghiệp vụ. Khi module có code thật, trong cùng thay đổi phải xóa resource tạm và thay assertion smoke test bằng việc nạp/kiểm entry point hay kiểu dữ liệu thật; cập nhật các smoke test module khác còn tham chiếu resource đó, giữ kiểm chứng dependency thật. Không giữ chúng để tăng coverage hoặc thay thế test nghiệp vụ. T00 chưa xóa vì chưa có code thật để thay.
+
+### Vị trí script CI và xác thực wrapper
+
+`.github/check_skeleton.py` và `.github/emulator_smoke.sh` là công cụ nghiệm thu khung project chỉ được workflow gọi: script đầu kiểm generated artifacts/tracked files; script sau điều khiển adb và lưu bằng chứng emulator. Đặt chúng cạnh workflow trong `.github/` để thể hiện quyền sở hữu CI, không đưa vào module Android, APK hay build-logic nghiệp vụ. Workflow gọi đường dẫn tường minh; script Python chỉ dùng thư viện chuẩn, shell dùng công cụ runner có sẵn. Nếu sau này được dùng như công cụ phát triển chung, task được giao sẽ đánh giá chuyển vị trí; T00 không tạo thêm lớp công cụ.
+
+[Input chính thức của setup-gradle tại commit đã ghim](https://github.com/gradle/actions/blob/0723195856401067f7a2779048b490ace7a47d7c/setup-gradle/action.yml) khai báo `validate-wrappers` mặc định `true`, kiểm tất cả wrapper JAR trong repo và làm action fail nếu checksum không hợp lệ. Workflow T00 đã được hưởng mặc định này; sau review khai báo rõ `validate-wrappers: true` tại cùng bước setup-gradle. Không cần thêm action wrapper-validation trùng chức năng. `distributionSha256Sum` trong wrapper properties kiểm distribution ZIP, là kiểm tra khác với xác thực wrapper JAR.
+
+Ba action bên thứ ba được ghim commit SHA đầy đủ, kèm comment tag đã đối chiếu:
+
+| Action | Tag | Commit SHA |
+| --- | --- | --- |
+| android-actions/setup-android | v3 | 9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 |
+| gradle/actions/setup-gradle | v5 | 0723195856401067f7a2779048b490ace7a47d7c |
+| reactivecircus/android-emulator-runner | v2 | a421e43855164a8197daf9d8d40fe71c6996bb0d |
+
+`actions/*` giữ tag theo quyết định Leader. Không thêm secret, Dependabot, quét dependency/secret, pipeline version hay release trong lần sửa T00 này; các việc đó vẫn thuộc task sau.
