@@ -1,0 +1,104 @@
+{
+  "$description": "MoneyMate design tokens v1.0.0 (G4). Nguồn duy nhất cho màu, chữ, khoảng cách. Không hardcode giá trị trong code UI.",
+  "version": "1.0.0",
+  "color": {
+    "light": {
+      "background": "#F4F6F9",
+      "surface": "#FFFFFF",
+      "surfaceVariant": "#EEF1F6",
+      "onSurface": "#1D2330",
+      "onSurfaceVariant": "#626A7C",
+      "primary": "#2E5C8A",
+      "onPrimary": "#FFFFFF",
+      "outline": "#DDE2EA",
+      "success": "#2E7D4F",
+      "warningContainer": "#FFF3D4",
+      "onWarningContainer": "#6A4A00",
+      "error": "#A03030"
+    },
+    "dark": {
+      "background": "#0F131A",
+      "surface": "#181D27",
+      "surfaceVariant": "#232A37",
+      "onSurface": "#E8ECF3",
+      "onSurfaceVariant": "#9AA3B5",
+      "primary": "#7FB0E0",
+      "onPrimary": "#0F131A",
+      "outline": "#2D3544",
+      "success": "#6FCF97",
+      "warningContainer": "#3A3118",
+      "onWarningContainer": "#F2D98A",
+      "error": "#FF8A8A"
+    }
+  },
+  "typography": {
+    "unit": "sp",
+    "screenTitle": {
+      "size": 20,
+      "lineHeight": 28,
+      "weight": 700
+    },
+    "body": {
+      "size": 15,
+      "lineHeight": 21,
+      "weight": 400
+    },
+    "label": {
+      "size": 13,
+      "lineHeight": 18,
+      "weight": 400
+    },
+    "caption": {
+      "size": 12,
+      "lineHeight": 16,
+      "weight": 400
+    },
+    "amountLarge": {
+      "size": 28,
+      "lineHeight": 34,
+      "weight": 700
+    },
+    "button": {
+      "size": 15,
+      "lineHeight": 20,
+      "weight": 600
+    },
+    "keypad": {
+      "size": 19,
+      "lineHeight": 24,
+      "weight": 400
+    },
+    "note": "Typeface hệ thống/Roboto; hỗ trợ cỡ chữ lớn đến 200%; số tiền dùng chữ số có độ rộng đều (tnum)."
+  },
+  "spacing": {
+    "unit": "dp",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "screenPaddingHorizontal": 16
+  },
+  "radius": {
+    "unit": "dp",
+    "card": 12,
+    "button": 10,
+    "chip": 16,
+    "dialog": 14
+  },
+  "size": {
+    "unit": "dp",
+    "minTouchTarget": 48,
+    "keypadKey": 56,
+    "avatarPlaceholder": 28,
+    "progressBarHeight": 8,
+    "pinDot": 14,
+    "bottomNavLabelSp": 12
+  },
+  "contrastChecked": {
+    "minimumRatio": 4.5,
+    "lightLowest": 4.79,
+    "darkLowest": 5.68,
+    "note": "Đã tính cho các cặp chữ/nền dùng trong thiết kế (onSurface, onSurfaceVariant, primary, onPrimary, success, onWarningContainer, error)."
+  }
+}

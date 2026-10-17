@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MoneyMate – Prototype</title>
+<style>
+:root{--bg:#f4f6f9;--ph:#fff;--fg:#1d2330;--mut:#626a7c;--card:#eef1f6;--pri:#2e5c8a;--onp:#fff;--ok:#2e7d4f;--warn:#fff3d4;--wfg:#6a4a00;--danger:#a03030;--line:#dde2ea;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#0f131a;--ph:#181d27;--fg:#e8ecf3;--mut:#9aa3b5;--card:#232a37;--pri:#7fb0e0;--onp:#0f131a;--ok:#6fcf97;--warn:#3a3118;--wfg:#f2d98a;--danger:#ff8a8a;--line:#2d3544}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#0f131a;--ph:#181d27;--fg:#e8ecf3;--mut:#9aa3b5;--card:#232a37;--pri:#7fb0e0;--onp:#0f131a;--ok:#6fcf97;--warn:#3a3118;--wfg:#f2d98a;--danger:#ff8a8a;--line:#2d3544}
+html,body{height:100%;margin:0}body{background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,"Segoe UI",Roboto,Arial,sans-serif;display:flex;flex-direction:column;align-items:center}
+.top{width:100%;max-width:420px;padding:10px 14px 4px;font-size:12px;color:var(--mut);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.top button{background:none;border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:4px 10px;font-size:12px}
+#ph{position:relative;width:100%;max-width:390px;flex:1;max-height:780px;margin:4px 0 10px;background:var(--ph);border:2px solid var(--line);border-radius:26px;overflow:hidden;display:flex;flex-direction:column}
+#app{flex:1;overflow:auto;padding:16px 18px}
+h1{font-size:20px;margin:6px 0 14px}.c{text-align:center}.mut{color:var(--mut);font-size:13px}
+.card{background:var(--card);border-radius:12px;padding:12px 14px;margin:0 0 10px}.warn{background:var(--warn);color:var(--wfg)}
+.btn{display:block;width:100%;border:0;border-radius:10px;padding:13px;font-size:15px;font-weight:600;background:var(--pri);color:var(--onp);margin:10px 0;cursor:pointer}
+.btn.o{background:none;border:2px solid var(--pri);color:var(--pri)}.btn:disabled{opacity:.4}
+.row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}.row .i{width:28px;height:28px;border-radius:50%;background:var(--card);flex:none}.row .m{flex:1}.row b{display:block}
+.amt{font-weight:700}.in{color:var(--ok)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px}.chip{padding:6px 12px;border-radius:16px;background:var(--card);cursor:pointer}.chip.on{background:var(--pri);color:var(--onp)}
+.dots{display:flex;justify-content:center;gap:12px;margin:18px 0}.dots i{width:14px;height:14px;border-radius:50%;border:2px solid var(--fg)}.dots i.f{background:var(--fg)}
+.kp{display:grid;grid-template-columns:repeat(3,64px);gap:12px;justify-content:center;margin:18px 0}.kp button{height:56px;border-radius:50%;border:2px solid var(--line);background:none;color:var(--fg);font-size:19px}
+nav{display:flex;border-top:1px solid var(--line)}nav button{flex:1;background:none;border:0;color:var(--mut);padding:10px 0 12px;font-size:12px;position:relative}nav button.on{color:var(--pri);font-weight:700}
+.bd{position:absolute;top:4px;margin-left:6px;background:var(--danger);color:#fff;border-radius:9px;font-size:10px;padding:0 5px}
+.sw{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.tg{width:42px;height:24px;border-radius:12px;background:var(--line);position:relative}.tg.on{background:var(--pri)}.tg:after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff}.tg.on:after{left:21px}
+.demo{position:absolute;right:12px;bottom:70px;background:var(--fg);color:var(--ph);border:0;border-radius:20px;padding:9px 14px;font-size:12px;font-weight:600;box-shadow:0 2px 8px #0005}
+#toast{position:absolute;left:14px;right:14px;bottom:76px;background:var(--fg);color:var(--ph);padding:10px 14px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}#toast.s{opacity:1}
+#md{position:absolute;inset:0;background:#0008;display:none;align-items:center;justify-content:center;padding:24px}#md.s{display:flex}#md div{background:var(--ph);border-radius:14px;padding:18px}
+</style></head><body>
+<div class="top"><span>Prototype · dữ liệu giả · F1, F2, F5</span><span><button id="th">Sáng/Tối</button> <button id="rs">Làm lại</button></span></div>
+<div id="ph"><div id="app"></div><div id="toast"></div><div id="md"><div id="mdc"></div></div></div>
+<script>
+const CATS=["Ăn uống","Di chuyển","Mua sắm","Hóa đơn","Khác"];
+const fm=n=>n.toLocaleString("vi-VN")+" đ";
+let S;
+function init(){S={s:"w01",pin:"",set:"",fails:0,lock:true,after:"1 phút",sel:null,cat:0,rule:true,msg:"",
+tx:[{c:"Lương",b:"MB",t:"08:00",a:8000000,in:1},{c:"Di chuyển",b:"BIDV",t:"09:10",a:58000}],
+q:[{c:"Ăn uống",b:"MSB",t:"14:32",a:25000,d:"ABCXYZ",p:62},{c:"Chưa rõ",b:"MSB",t:"19:45",a:120000,d:"CK NGUYEN VAN A",p:0}]}}
+function toast(t){const e=document.getElementById("toast");e.textContent=t;e.className="s";clearTimeout(toast.h);toast.h=setTimeout(()=>e.className="",2200)}
+function dots(){return `<div class="dots">${[0,1,2,3,4,5].map(i=>`<i class="${i<S.pin.length?"f":""}"></i>`).join("")}</div>`}
+function kp(dis){return `<div class="kp">${[1,2,3,4,5,6,7,8,9,"◉",0,"⌫"].map(k=>`<button ${dis?"disabled":""} data-a="k:${k}">${k}</button>`).join("")}</div>`}
+function nav(a){const t=[["w04","Giao dịch"],["w05","Cần xác nhận"],["w07","Báo cáo"],["w09","Cài đặt"]];
+return `<nav>${t.map(([k,l])=>`<button class="${a===k?"on":""}" data-a="go:${k}">${l}${k==="w05"&&S.q.length?`<span class="bd">${S.q.length}</span>`:""}</button>`).join("")}</nav>`}
+function row(x,r){return `<div class="row"><div class="i"></div><div class="m"><b>${x.c}</b><span class="mut">${x.b} · ${x.t}</span></div><span class="amt ${x.in?"in":""}">${x.in?"+":"-"}${r?x.a.toLocaleString("vi-VN"):x.a.toLocaleString("vi-VN")}</span></div>`}
+const V={
+w01:()=>[`<div class="c" style="margin-top:50px"><div class="card" style="width:84px;height:84px;margin:0 auto 14px"></div><h1>MoneyMate</h1><p class="mut">Trợ lý tài chính cá nhân tự động, ghi chi tiêu từ thông báo ngân hàng</p></div>
+<div style="margin:22px 4px">${["Không cần nhập tay","Không liên kết tài khoản ngân hàng","Dữ liệu nằm trên điện thoại của bạn"].map(t=>`<p>✓ ${t}</p>`).join("")}</div><button class="btn" data-a="go:w02">Bắt đầu</button><p class="c mut">Chính sách quyền riêng tư</p>`],
+w02:()=>[`<h1>Tạo mã PIN 6 số</h1><p class="mut">PIN dùng để mở khóa ứng dụng trên máy này.</p>${dots()}${kp()}<p class="mut c">${S.msg}</p>`],
+w03:()=>[`<h1>Cho phép đọc thông báo</h1><p class="mut">MoneyMate chỉ đọc thông báo của app ngân hàng được hỗ trợ để tự ghi giao dịch.</p><div class="card"><b>Các bước</b><br>1. Bấm “Mở cài đặt”<br>2. Chọn MoneyMate<br>3. Bật “Cho phép truy cập thông báo”</div><div class="card warn"><b>Android 13+ cài từ APK?</b><br>Cần bật “Cho phép cài đặt bị hạn chế” trước.</div><button class="btn" data-a="perm">Mở cài đặt</button><button class="btn o" data-a="toast:Đây là hướng dẫn từng bước (ngoài phạm vi prototype)">Tôi cần hướng dẫn</button>`],
+w04:()=>{const o=S.tx.filter(x=>!x.in).reduce((a,x)=>a+x.a,0),i=S.tx.filter(x=>x.in).reduce((a,x)=>a+x.a,0);
+return [`<h1>Tháng 10/2026</h1><div class="card"><b>Chi ${fm(o)}</b><br>Thu ${fm(i)}</div>${S.q.length?`<div class="card warn" data-a="go:w05" style="cursor:pointer">⚠ ${S.q.length} giao dịch cần xác nhận ›</div>`:""}${S.tx.map(x=>row(x)).join("")||`<p class="mut c">Chưa có giao dịch. Giao dịch sẽ tự xuất hiện khi ngân hàng gửi thông báo.</p>`}<button class="demo" data-a="sim">▶ Mô phỏng: MSB gửi thông báo</button>`,"w04"]},
+w05:()=>[`<h1>Cần xác nhận (${S.q.length})</h1>${S.q.map((x,i)=>`<div class="card"><b>-${x.a.toLocaleString("vi-VN")} đ · ${x.b} ${x.t}</b><br><span class="mut">Nội dung: ${x.d}</span><br>Gợi ý: ${x.c}${x.p?` (${x.p}%)`:""}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" style="margin:0" data-a="ok:${i}">Xác nhận</button><button class="btn o" style="margin:0" data-a="ed:${i}">Đổi danh mục</button></div></div>`).join("")||`<p class="mut c" style="margin-top:60px">Không có gì cần xác nhận 🎉</p>`}`,"w05"],
+w06:()=>{const x=S.q[S.sel];return [`<h1>‹ Chi tiết giao dịch</h1><div class="c"><div style="font-size:28px;font-weight:700">-${x.a.toLocaleString("vi-VN")} đ</div><div class="mut">${x.b} · 16/10/2026 ${x.t}</div></div><div class="card" style="margin-top:14px">Nội dung: ${x.d}</div><b class="mut">Danh mục</b><div class="chips">${CATS.map((c,i)=>`<span class="chip ${S.cat===i?"on":""}" data-a="cat:${i}">${c}</span>`).join("")}</div>
+<div class="card" data-a="rule" style="cursor:pointer">${S.rule?"☑":"☐"} Tạo rule: nội dung chứa “${x.d}” → ${CATS[S.cat]}</div><button class="btn" data-a="save">Lưu</button>`]},
+w07:()=>{const m={};S.tx.filter(x=>!x.in).forEach(x=>m[x.c]=(m[x.c]||0)+x.a);const t=Object.values(m).reduce((a,b)=>a+b,0)||1;
+return [`<h1>Báo cáo tháng 10</h1>${Object.entries(m).map(([k,v])=>`<div style="margin:12px 0"><div style="display:flex;justify-content:space-between"><span>${k}</span><b>${fm(v)}</b></div><div style="height:8px;border-radius:4px;background:var(--card)"><div style="height:8px;border-radius:4px;background:var(--pri);width:${Math.round(v/t*100)}%"></div></div></div>`).join("")}`,"w07"]},
+w09:()=>[`<h1>Cài đặt</h1><b class="mut">Bảo mật</b><div class="sw" data-a="lk"><span>Khóa ứng dụng</span><span class="tg ${S.lock?"on":""}"></span></div><div class="sw" data-a="af"><span>Tự khóa sau</span><span class="mut">${S.after} ›</span></div><button class="btn o" data-a="lockn">Khóa ngay (xem màn hình khóa)</button>
+<b class="mut">Khác</b>${["Quản lý rule và danh mục","Không đọc được (2)","Xuất CSV","Quyền riêng tư"].map(t=>`<div class="sw" data-a="toast:${t}: ngoài phạm vi prototype"><span>${t}</span><span class="mut">›</span></div>`).join("")}<p class="c mut">MoneyMate 0.1.0-alpha.1 (prototype)</p>`,"w09"],
+w13:()=>[`<div class="c" style="margin-top:40px"><div class="card" style="width:70px;height:70px;margin:0 auto 14px"></div><b>Nhập PIN để mở MoneyMate</b></div>${dots()}<p class="c" style="color:var(--danger);min-height:20px">${S.msg}</p>${kp(S.fails>=5)}<p class="c"><a href="#" data-a="forgot" style="color:var(--pri)">Quên PIN?</a></p><p class="mut c" style="font-size:12px">Prototype: PIN ${S.set||"123456"} · ◉ = sinh trắc</p>`]
+};
+function render(){const r=V[S.s]();document.getElementById("app").innerHTML=r[0];
+const n=r[1];let h=document.getElementById("nv");if(h)h.remove();if(n)document.getElementById("ph").insertAdjacentHTML("beforeend",`<div id="nv">${nav(n)}</div>`)}
+function pinIn(k){if(k==="⌫"){S.pin=S.pin.slice(0,-1);return}
+if(k==="◉"){if(S.s==="w13"){S.pin="";S.fails=0;S.msg="";S.s="w04";toast("Mở khóa bằng sinh trắc học")}return}
+if(S.pin.length<6)S.pin+=k;
+if(S.pin.length===6){if(S.s==="w02"){S.set=S.pin;S.pin="";S.s="w03";toast("Đã tạo PIN")}
+else if(S.s==="w13"){const ok=S.pin===(S.set||"123456");S.pin="";if(ok){S.fails=0;S.msg="";S.s="w04"}else{S.fails++;S.msg=S.fails>=5?"Sai 5 lần. Khóa tạm thời 30 giây (thời gian chờ tăng dần).":`Sai PIN (${S.fails}/5)`}}}}
+document.getElementById("ph").addEventListener("click",e=>{const el=e.target.closest("[data-a]");if(!el){if(e.target.id==="md")e.target.className="";return}
+e.preventDefault();const [a,...p]=el.dataset.a.split(":"),v=p.join(":");
+if(a==="go")S.s=v;else if(a==="k")pinIn(v);else if(a==="toast"){toast(v);return}
+else if(a==="perm"){toast("Đã bật quyền thông báo");S.s="w04"}
+else if(a==="sim"){S.q.unshift({c:"Ăn uống",b:"MSB",t:"14:32",a:25000,d:"ABCXYZ",p:62});toast("Notification MSB: -25,000 VND → độ tin cậy 62%, vào hàng đợi")}
+else if(a==="ok"){const x=S.q.splice(+v,1)[0];S.tx.unshift({c:x.c==="Chưa rõ"?"Khác":x.c,b:x.b,t:x.t,a:x.a});toast("Đã xác nhận")}
+else if(a==="ed"){S.sel=+v;S.cat=Math.max(0,CATS.indexOf(S.q[+v].c));S.rule=true;S.s="w06"}
+else if(a==="cat")S.cat=+v;else if(a==="rule")S.rule=!S.rule;
+else if(a==="save"){const x=S.q.splice(S.sel,1)[0];S.tx.unshift({c:CATS[S.cat],b:x.b,t:x.t,a:x.a});toast(S.rule?`Đã tạo rule: chứa “${x.d}” → ${CATS[S.cat]}`:"Đã lưu");S.s="w05"}
+else if(a==="lk"){S.lock=!S.lock;toast(S.lock?"Đã bật khóa ứng dụng":"Đã tắt khóa ứng dụng")}
+else if(a==="af"){const o=["Ngay","30 giây","1 phút","5 phút"];S.after=o[(o.indexOf(S.after)+1)%4]}
+else if(a==="lockn"){if(!S.lock){toast("Hãy bật Khóa ứng dụng trước");return}S.pin="";S.msg="";S.s="w13"}
+else if(a==="forgot"){document.getElementById("mdc").innerHTML=`<b>Quên PIN?</b><p class="mut">Xác thực bằng khóa màn hình của thiết bị để đặt PIN mới. Nếu không xác thực được, dữ liệu cục bộ sẽ bị xóa.</p><button class="btn" data-a="mdok">Dùng khóa màn hình thiết bị</button>`;document.getElementById("md").className="s";return}
+else if(a==="mdok"){document.getElementById("md").className="";S.fails=0;S.msg="";S.pin="";S.set="";S.s="w02";toast("Đặt PIN mới")}
+render()});
+document.getElementById("rs").onclick=()=>{init();render()};
+document.getElementById("th").onclick=()=>{const r=document.documentElement,d=getComputedStyle(r).getPropertyValue("--bg").trim()==="#0f131a";r.dataset.theme=d?"light":"dark"};
+init();render();
+</script></body></html>
