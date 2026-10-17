@@ -7,6 +7,6 @@ class ModuleSmokeTest {
     @Test
     fun launcherActivityLoadsFromApplicationModule() {
         val activity = Class.forName("com.app.moneymate.MainActivity", false, javaClass.classLoader)
-        assertEquals("androidx.activity.ComponentActivity", activity.superclass.name)
+        assertEquals("androidx.activity.ComponentActivity", requireNotNull(activity.superclass).name)
     }
 }
