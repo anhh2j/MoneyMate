@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    id("moneymate.app-version")
 }
 
 android {
@@ -11,9 +12,6 @@ android {
         applicationId = "com.app.moneymate"
         minSdk = 26
         targetSdk = 37
-        // tạm, sẽ được T00b thay bằng version.properties
-        versionName = "0.0.0-dev"
-        versionCode = 1
     }
     buildFeatures { compose = true }
     compileOptions {

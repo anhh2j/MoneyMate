@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "scripts": {
+    "commitlint": "commitlint",
+    "test:release-config": "node scripts/test_release_config.cjs"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "21.2.4",
+    "@commitlint/config-conventional": "21.2.4"
+  }
+}

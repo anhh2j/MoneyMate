@@ -20,3 +20,6 @@ Chỉ 9 tệp DOCX được liệt kê ở trên là tài liệu hiện hành tr
 - [Design handoff](design/README.md)
 - [Mẫu ADR](adr/0000-template.md)
 - [ADR-0001 — Cấu trúc module](adr/0001-kien-truc-module.md)
+
+- [ADR-0002 — Version và phát hành](adr/0002-cong-cu-phat-hanh.md)
+- [ADR-0003 — Quét bảo mật](adr/0003-quet-bao-mat.md)

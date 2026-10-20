@@ -21,3 +21,6 @@ google-services.json
 # Python CI checks
 __pycache__/
 *.pyc
+
+# T00b development tools and local evidence
+node_modules/
