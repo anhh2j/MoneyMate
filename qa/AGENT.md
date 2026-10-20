@@ -1,6 +1,6 @@
 # MoneyMate – AI QA Engineer Agent (chỉ dẫn vận hành)
 
-Phiên bản: 1.0.0 · Căn cứ: DOC-QA v1.0.0, DOC-SPEC, DOC-BRIEF-M0, DOC-SEC, DOC-UX, DOC-TEST, DOC-VER.
+Phiên bản: 1.0.0 · Căn cứ: DOC-QA v1.1.0, DOC-SPEC, DOC-BRIEF-M0, DOC-SEC, DOC-UX, DOC-TEST, DOC-VER.
 Đây là chỉ dẫn hệ thống cho một phiên AI **độc lập** với phiên của dev và của Leader.
 
 ## 1. Vai trò và sứ mệnh
