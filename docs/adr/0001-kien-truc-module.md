@@ -110,3 +110,9 @@ Leader đã **đóng R3.3-2**, chấp nhận tổng hợp bằng chứng Google 
 Theo ngoại lệ R2 đã được PO cho phép, tiếp tục dùng Git local, tải công cụ công khai không đăng nhập và chạy kiểm tra trên clone local sạch; không dùng tài khoản GitHub, push, PR, tag, release hoặc merge. Chỉ xem xét Local-accepted sau khi có đầy đủ log Gradle và check_skeleton chạy thật; CI PR và emulator có thể DEFERRED, không ghi pass. Leader là người chốt nghiệm thu.
 
 Ghi nhận cảnh báo deprecation Configuration.setVisible() có thể xuất hiện khi AGP 9.4.1 chạy cùng Gradle mới. Không bật warnings-as-errors cho cảnh báo Gradle; giữ nguyên Android lint warningsAsErrors và mọi ngưỡng kiểm tra. Báo cáo lần chạy phải lưu đầy đủ nội dung và số cảnh báo thực tế.
+
+### Khôi phục CI GitHub ngày 2026-10-20
+
+CI thật tại commit46531c5 qua build/test nhưng lintDebug chặn vì Gradle9.8.2 đã được phát hành, trong khi wrapper ghim9.8.1. Cập nhật công cụ Gradle lên patch9.8.2 theo [trang phát hành](https://gradle.org/releases/) và [checksum chính thức](https://gradle.org/release-checksums/): distribution ZIP SHA256 `21bd5da2de49b642904077f38c0efdc7778e92b3ed0889392dca61b97e389607`. Wrapper JAR hiện có khớp SHA256 công bố cho cả9.8.1/9.8.2 nên không thay JAR. Giữ URL distribution chính thức và checksum bắt buộc.
+
+Đây là cập nhật công cụ build trong phạm vi Gradle wrapper của T00 để đáp ứng kiểm stable hiện tại, không đổi version ứng dụng0.0.0-dev/code1, AGP, Kotlin hoặc dependency catalog. Giữ nguyên lint warningsAsErrors/abortOnError, test và ngưỡng coverage; không ignore/baseline lỗi để làm xanh. Các lệnh DoD và emulator phải chạy lại trên HEAD mới. Lượt lỗi cũ được giữ tại https://github.com/anhh2j/MoneyMate/actions/runs/39415129557; kết quả mới sẽ ghi vào PR.
