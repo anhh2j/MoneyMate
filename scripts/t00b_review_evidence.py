@@ -219,10 +219,20 @@ def package_review(args):
             exits[name] = run(["git", "--git-dir", gitdir, *command], review / (name + ".txt"))
         restore = pathlib.Path(directory) / "restored"
         exits["bundle-clone"] = run(["git", "clone", "--quiet", "-b", "review-head", review / "MoneyMate.git.bundle", restore], review / "bundle-clone.log")
+        conversions = []
         for item in checksums:
             digest, name = item.rstrip("\n").split("  ", 1)
-            if hashlib.sha256((restore / name).read_bytes()).hexdigest() != digest:
-                raise RuntimeError("Restored bundle source mismatch")
+            restored_blob = subprocess.check_output(["git", "-C", restore, "show", "HEAD:" + name])
+            if hashlib.sha256(restored_blob).hexdigest() != digest:
+                raise RuntimeError("Restored bundle Git blob mismatch: " + name)
+            expected_checkout = subprocess.check_output(["git", "-C", restore, "cat-file", "--filters", "--path=" + name, "HEAD:" + name])
+            actual_checkout = (restore / name).read_bytes()
+            if actual_checkout != expected_checkout:
+                raise RuntimeError("Restored checkout differs from Git attributes: " + name)
+            if expected_checkout != restored_blob:
+                conversions.append({"path": name, "blob_sha256": digest, "checkout_sha256": hashlib.sha256(actual_checkout).hexdigest(), "reason": "Git attributes checkout filter"})
+        dump(review / "bundle-checkout-conversions.json", conversions)
+        print("BUNDLE_CHECKOUT_CONVERSIONS " + json.dumps(conversions), flush=True)
     dump(review / "exit-codes.json", exits)
     run_url = "https://github.com/" + os.environ["GITHUB_REPOSITORY"] + "/actions/runs/" + os.environ["GITHUB_RUN_ID"]
     dump(review / "context.json", {"head": head, "base": base, "checkout": checkout, "tree": head_tree, "run": run_url, "junit": totals, "source_files": len(checksums), "acceptance": "PENDING independent QA/Leader"})
@@ -257,6 +267,7 @@ def package_review(args):
         if z.testzip() is not None:
             raise RuntimeError("ZIP CRC failure")
     pathlib.Path(str(archive) + ".sha256").write_text(hashlib.sha256(archive.read_bytes()).hexdigest() + "  " + archive.name + "\n")
+    print((review / "diff-stat-main.txt").read_text(), flush=True)
     print((review / "context.json").read_text(), flush=True)
     print((review / "QA_AUTO_CHECKS.md").read_text(), flush=True)
     print("ARCHIVE_SHA256 " + hashlib.sha256(archive.read_bytes()).hexdigest(), flush=True)
