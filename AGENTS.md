@@ -1,6 +1,6 @@
 # Quy tắc chung cho AI dev
 
-Nguồn: DOC-BRIEF-M0 v1.3.0, mục 2.
+Nguồn: DOC-BRIEF-M0 v1.5.0, mục 2.
 
 Chỉ làm đúng phạm vi trong brief. Thấy việc cần làm thêm thì ghi vào mục “Đề xuất” trong PR, không tự làm.
 
@@ -19,3 +19,5 @@ Không đổi version, không tạo tag, không ký/phát hành release. Chỉ �
 Commit theo Conventional Commits; tiêu đề PR cũng theo định dạng đó. PR mô tả: Task ID, AC liên quan, đã làm gì, cách kiểm tra, điều chưa làm, BLOCKER nếu có.
 
 Trước khi báo xong: tự chạy toàn bộ lệnh kiểm tra trong DoD và dán kết quả vào PR. Không tự tuyên bố “xong” khi CI chưa xanh.
+
+Cổng QA: gói review phải đủ cho QA agent kiểm tra độc lập (DOC-QA mục 3.1). Lỗi QA báo thì sửa trên cùng nhánh bằng commit fix(...); phản biện bằng bằng chứng gửi Leader, không tự đổi test hay ngưỡng, không sửa qa/tests/.

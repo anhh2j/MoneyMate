@@ -2,7 +2,7 @@
 
 - Ngày: 2026-10-17
 - Trạng thái: Đề xuất để Leader review trong PR T00
-- Căn cứ: DOC-SPEC v2.1.0 mục 3/8, DOC-BRIEF-M0 v1.3.0 mục 2/3, DOC-VER v1.2.6.
+- Căn cứ: DOC-SPEC v2.1.0 mục 3/8, DOC-BRIEF-M0 v1.5.0 mục 2/3, DOC-VER v1.4.0.
 
 ## Bối cảnh
 
@@ -116,3 +116,9 @@ Ghi nhận cảnh báo deprecation Configuration.setVisible() có thể xuất h
 CI thật tại commit46531c5 qua build/test nhưng lintDebug chặn vì Gradle9.8.2 đã được phát hành, trong khi wrapper ghim9.8.1. Cập nhật công cụ Gradle lên patch9.8.2 theo [trang phát hành](https://gradle.org/releases/) và [checksum chính thức](https://gradle.org/release-checksums/): distribution ZIP SHA256 `21bd5da2de49b642904077f38c0efdc7778e92b3ed0889392dca61b97e389607`. Wrapper JAR hiện có khớp SHA256 công bố cho cả9.8.1/9.8.2 nên không thay JAR. Giữ URL distribution chính thức và checksum bắt buộc.
 
 Đây là cập nhật công cụ build trong phạm vi Gradle wrapper của T00 để đáp ứng kiểm stable hiện tại, không đổi version ứng dụng0.0.0-dev/code1, AGP, Kotlin hoặc dependency catalog. Giữ nguyên lint warningsAsErrors/abortOnError, test và ngưỡng coverage; không ignore/baseline lỗi để làm xanh. Các lệnh DoD và emulator phải chạy lại trên HEAD mới. Lượt lỗi cũ được giữ tại https://github.com/anhh2j/MoneyMate/actions/runs/39415129557; kết quả mới sẽ ghi vào PR.
+
+### Đồng bộ tài liệu Approved theo Leader R3.1 ngày 2026-10-20
+
+Đồng bộ main tại `c11a50f477b12a57498f7f8c99a5ab797491d4d8` vào nhánh T00. Chín DOCX hiện hành giữ nguyên blob/bytes của main: Spec2.1.0, Plan2.3.0, Test2.3.0, Ver1.4.0, Brief-M0 1.5.0, Sec1.1.0, UX/UI1.2.0, QA1.1.0 và Test Cases1.0.0. AGENTS, README và danh mục tài liệu tham chiếu bản Approved này; các đoạn R1/R2 phía trên giữ ý nghĩa lịch sử theo ngày review.
+
+Có hai xung đột rename/delete do T00 đã đưa Ver1.2.5 và Brief1.2.1 vào archive, còn main xóa đường dẫn cũ. Giữ hai bản archive đã có; chuyển Ver1.2.6 và Brief1.3.0 khỏi danh mục hiện hành vào archive bằng rename, không nhân bản. Không khôi phục Plan2.1.3/Test2.1.0 đã được main xóa. Bộ qa/ được lấy từ main; chỉ sửa tham chiếu DOC-QA ở header AGENT.md thành1.1.0, không đổi tool, checklist hay test QA. Không đổi code/build/workflow, version app hoặc đưa T00b vào T00.

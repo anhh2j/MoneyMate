@@ -64,6 +64,6 @@ Không tạo auth/sync ở MVP. `applicationId`: `com.app.moneymate`; minSdk 26,
 
 ## Version và phạm vi
 
-Version tạm chỉ khai báo trong `app/build.gradle.kts`, theo DOC-BRIEF-M0 v1.2.1. T00b sẽ gỡ các giá trị tạm và đọc từ version.properties, bổ sung pipeline version/release. T00 không hiển thị version, không ký/phát hành release, không tạo tag. CI chỉ assemble debug; việc xử lý release manifest phục vụ kiểm quyền, không sinh APK release.
+Version tạm chỉ khai báo trong `app/build.gradle.kts`, theo DOC-BRIEF-M0 v1.5.0. T00b sẽ gỡ các giá trị tạm và đọc từ version.properties, bổ sung pipeline version/release. T00 không hiển thị version, không ký/phát hành release, không tạo tag. CI chỉ assemble debug; việc xử lý release manifest phục vụ kiểm quyền, không sinh APK release.
 
 Quy tắc làm việc: [AGENTS.md](AGENTS.md). Tài liệu: [docs/README.md](docs/README.md). Quyết định: [ADR-0001](docs/adr/0001-kien-truc-module.md).
