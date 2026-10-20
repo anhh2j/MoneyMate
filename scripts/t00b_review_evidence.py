@@ -137,12 +137,14 @@ def compare_graphs(tools):
         result = REPORT / (label + "-vulnerabilities.json")
         run([tools / "trivy", "sbom", "--severity", "HIGH,CRITICAL", "--exit-code", "1", "--format", "json", "--output", result, REPORT / label / "full-resolved.cdx.json"], REPORT / (label + "-scan.log"), expected=expected_exit)
         findings = [v for r in json.loads(result.read_text()).get("Results", []) for v in r.get("Vulnerabilities", [])]
+        print("SCAN " + label + " " + json.dumps([{"id": v.get("VulnerabilityID"), "severity": v.get("Severity"), "package": v.get("PkgName"), "installed": v.get("InstalledVersion")} for v in findings]), flush=True)
         if (label == "before" and not findings) or (label == "after" and findings):
             raise RuntimeError("Scanner control did not produce the required evidence")
     if (ROOT / "gradle/verification-metadata.xml").read_bytes() != original:
         raise RuntimeError("Production metadata was modified")
     dump(REPORT / "loaded-jar-audit.json", loaded)
     dump(REPORT / "validation.json", {"result": "PASS", "before": len(before), "after": len(after), "removed": sorted(removed), "added": sorted(added), "independent_sbom_union_matches": True, "loaded_class_checks": len(loaded), "source_metadata_unchanged": True})
+    print((REPORT / "validation.json").read_text(), flush=True)
     print("PASS: independent before/after graphs, exact five-GAV delta, full SBOM coverage, actual JARs and scans")
 
 
@@ -255,6 +257,9 @@ def package_review(args):
         if z.testzip() is not None:
             raise RuntimeError("ZIP CRC failure")
     pathlib.Path(str(archive) + ".sha256").write_text(hashlib.sha256(archive.read_bytes()).hexdigest() + "  " + archive.name + "\n")
+    print((review / "context.json").read_text(), flush=True)
+    print((review / "QA_AUTO_CHECKS.md").read_text(), flush=True)
+    print("ARCHIVE_SHA256 " + hashlib.sha256(archive.read_bytes()).hexdigest(), flush=True)
     print("REVIEW_ARCHIVE " + str(archive))
     print("QA_AUTO_EXIT " + str(result.returncode) + " (not independent QA acceptance)")
 
