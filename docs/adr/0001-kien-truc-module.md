@@ -2,7 +2,7 @@
 
 - Ngày: 2026-10-17
 - Trạng thái: Đề xuất để Leader review trong PR T00
-- Căn cứ: DOC-SPEC v2.1.0 mục 3/8, DOC-BRIEF-M0 v1.2.1 mục 2/3, DOC-VER v1.2.5.
+- Căn cứ: DOC-SPEC v2.1.0 mục 3/8, DOC-BRIEF-M0 v1.3.0 mục 2/3, DOC-VER v1.2.6.
 
 ## Bối cảnh
 
@@ -96,3 +96,17 @@ Ba action bên thứ ba được ghim commit SHA đầy đủ, kèm comment tag 
 | reactivecircus/android-emulator-runner | v2 | a421e43855164a8197daf9d8d40fe71c6996bb0d |
 
 `actions/*` giữ tag theo quyết định Leader. Không thêm secret, Dependabot, quét dependency/secret, pipeline version hay release trong lần sửa T00 này; các việc đó vẫn thuộc task sau.
+
+### Cập nhật bằng chứng AGP ngày 2026-10-19 (làm việc local)
+
+[Android Gradle plugin API reference chính thức](https://developer.android.com/reference/tools/gradle-api) ghi bảng `Current Release` là `9.4.1`, còn `Preview Releases` là `9.5.0-alpha10`. Liên kết 9.4.1 dẫn tới [API của dòng 9.4](https://developer.android.com/reference/tools/gradle-api/9.4/classes). Đây là nguồn chính thức bổ sung mạnh hơn việc chỉ thấy artifact trong Maven; việc phân loại Current Release riêng với Preview hỗ trợ nhận định 9.4.1 thuộc dòng phát hành hiện tại, không phải preview.
+
+[Liên kết stable release notes từ cùng trang](https://developer.android.com/studio/releases/gradle-plugin) vẫn dẫn tới trang AGP 9.4.0; nội dung được truy xuất ngày 2026-10-19 chưa có mục patch 9.4.1. Vì yêu cầu R3.3-2 của Leader chỉ định trang phát hành chứng minh patch stable, giữ trạng thái **chờ Leader chấp nhận bằng chứng API reference**, không tự đóng BLOCKER. Không thay đổi catalog, version ứng dụng hoặc cấu hình build. Bản cập nhật này chưa commit/push theo quyết định tạm ngừng Git/GitHub của PO.
+
+### Quyết định Leader review R2 ngày 2026-10-19
+
+Leader đã **đóng R3.3-2**, chấp nhận tổng hợp bằng chứng Google Maven, API reference chính thức ghi Current Release 9.4.1, và đối chiếu release notes AGP 9.5.0 ở review R2. Các đoạn BLOCKER phía trên ghi lại diễn biến trước quyết định này; trạng thái hiện hành là **đã đóng theo Leader**, không còn chờ chấp nhận nguồn API reference. Khi release notes chính thức có mục patch 9.4.1, bổ sung link ở lần sửa ADR kế tiếp; đây không phải điều kiện chặn.
+
+Theo ngoại lệ R2 đã được PO cho phép, tiếp tục dùng Git local, tải công cụ công khai không đăng nhập và chạy kiểm tra trên clone local sạch; không dùng tài khoản GitHub, push, PR, tag, release hoặc merge. Chỉ xem xét Local-accepted sau khi có đầy đủ log Gradle và check_skeleton chạy thật; CI PR và emulator có thể DEFERRED, không ghi pass. Leader là người chốt nghiệm thu.
+
+Ghi nhận cảnh báo deprecation Configuration.setVisible() có thể xuất hiện khi AGP 9.4.1 chạy cùng Gradle mới. Không bật warnings-as-errors cho cảnh báo Gradle; giữ nguyên Android lint warningsAsErrors và mọi ngưỡng kiểm tra. Báo cáo lần chạy phải lưu đầy đủ nội dung và số cảnh báo thực tế.

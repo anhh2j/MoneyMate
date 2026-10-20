@@ -1,6 +1,6 @@
 # Quy tắc chung cho AI dev
 
-Nguồn: DOC-BRIEF-M0 v1.2.1, mục 2.
+Nguồn: DOC-BRIEF-M0 v1.3.0, mục 2.
 
 Chỉ làm đúng phạm vi trong brief. Thấy việc cần làm thêm thì ghi vào mục “Đề xuất” trong PR, không tự làm.
 
