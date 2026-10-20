@@ -1,0 +1,30 @@
+import groovy.json.JsonOutput
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.artifacts.result.ResolvedDependencyResult
+
+gradle.beforeProject { p ->
+    p.tasks.register('reviewFullGraph') {
+        doLast {
+            def scopes = p.buildscript.configurations.findAll { it.canBeResolved }.collect { ['buildscript:' + it.name, it] }
+            scopes.addAll(p.configurations.findAll { it.canBeResolved }.collect { ['module:' + it.name, it] })
+            def data = scopes.collect { entry ->
+                def result = entry[1].incoming.resolutionResult
+                def unresolved = result.allDependencies.findAll { !(it instanceof ResolvedDependencyResult) }
+                if (unresolved) throw new GradleException('Unresolved review graph: ' + unresolved)
+                [
+                    configuration: entry[0],
+                    components: result.allComponents.findAll { it.id instanceof ModuleComponentIdentifier }.collect {
+                        [id: it.id.displayName, reasons: it.selectionReason.descriptions.collect { reason -> reason.description }]
+                    }.sort { it.id },
+                    edges: result.allDependencies.collect {
+                        [from: it.from.id.displayName, requested: it.requested.displayName, selected: it.selected.id.displayName]
+                    }
+                ]
+            }
+            def output = new File(p.layout.buildDirectory.get().asFile, 'reports/security/review-full-graph.json')
+            output.parentFile.mkdirs()
+            output.text = JsonOutput.prettyPrint(JsonOutput.toJson([project: p.path, configurations: data]))
+            println('REVIEW_GRAPH ' + output)
+        }
+    }
+}

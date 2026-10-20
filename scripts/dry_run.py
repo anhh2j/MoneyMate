@@ -3,6 +3,7 @@ import base64
 import os
 import pathlib
 import secrets
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -31,6 +32,26 @@ def dry_run():
         with (reports / "verify-pass.log").open("w") as log:
             subprocess.run(command + ["v" + name, str(apk), "--checksum", str(apk) + ".sha256"], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
             log.write("\nEXIT_CODE: 0\n")
+        # Validate release-please headings without editing tracked source.
+        with tempfile.TemporaryDirectory(prefix="moneymate-changelog-probe-") as fixture:
+            fixture = pathlib.Path(fixture)
+            shutil.copyfile(ROOT / "version.properties", fixture / "version.properties")
+            subprocess.run(["git", "init", "--quiet", str(fixture)], check=True)
+            headings = [
+                ("plain", "## " + name + "\n", 0),
+                ("bracket", "## [" + name + "]\n", 0),
+                ("linked", "## [" + name + "](https://example.invalid/compare)\n", 0),
+                ("wrong-version", "## " + name + ".0\n", 1),
+            ]
+            for label, heading, expected in headings:
+                (fixture / "CHANGELOG.md").write_text(heading)
+                with (reports / ("verify-changelog-" + label + ".log")).open("w") as log:
+                    result = subprocess.run(command + ["v" + name, str(apk), "--root", str(fixture)], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
+                    log.write("\nEXIT_CODE: " + str(result.returncode) + "\nEXPECTED_EXIT_CODE: " + str(expected) + "\n")
+                if result.returncode != expected:
+                    raise RuntimeError("Unexpected changelog verification result: " + label)
+                if expected and "Missing CHANGELOG entry" not in (reports / ("verify-changelog-" + label + ".log")).read_text():
+                    raise RuntimeError("Changelog negative failed for an unrelated reason")
         different = "v0.0.1" if name != "0.0.1" else "v0.0.2"
         with (reports / "verify-tag-mismatch.log").open("w") as log:
             result = subprocess.run(command + [different, str(apk)], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)

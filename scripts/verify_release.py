@@ -40,7 +40,9 @@ def verify(args):
         raise ValueError("APK applicationId/versionName/versionCode does not match tag and formula")
     subprocess.run([tool("apksigner", args.apksigner), "verify", "--verbose", str(apk)], check=True)
     changelog = (pathlib.Path(args.root) / "CHANGELOG.md").read_text()
-    if not re.search(r"^## \[" + re.escape(expected[0]) + r"\](?:\([^\s)]+\))?(?:[ \t]|$)", changelog, re.MULTILINE):
+    version = re.escape(expected[0])
+    heading = r"^## (?:\[" + version + r"\](?:\([^\s)]+\))?|" + version + r")(?:[ \t]|$)"
+    if not re.search(heading, changelog, re.MULTILINE):
         raise ValueError("Missing CHANGELOG entry for release version")
     tracked = subprocess.check_output(["git", "ls-files", "-z"], cwd=args.root).decode().split("\0")
     if any(pathlib.Path(p).suffix.lower() in {".jks", ".keystore", ".p12", ".pem"} for p in tracked if p):

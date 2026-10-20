@@ -79,3 +79,15 @@ commitlint=str(root/'node_modules/.bin/commitlint')
 run([commitlint,'--config',str(root/'commitlint.config.cjs')],'commit-negative.log',1,'invalid message\n')
 assert 'type-empty' in (out/'commit-negative.log').read_text()
 run([commitlint,'--config',str(root/'commitlint.config.cjs'),'--from','30056b7','--to','HEAD','--verbose'],'commitlint-all.log',0)
+
+# The configured release title must satisfy the ordinary commit/PR contract.
+import sys
+sys.path.insert(0, str(root / "scripts"))
+from versioning import read_version
+release_name, _ = read_version(root)
+release_config = json.loads((root / "release-please-config.json").read_text())
+release_title = release_config["pull-request-title-pattern"].replace("${version}", release_name)
+assert "${" not in release_title, "Unresolved release PR title placeholder"
+run([commitlint, "--config", str(root / "commitlint.config.cjs")], "release-pr-title-negative.log", 1, "chore(main): release " + release_name + "\n")
+assert "scope-enum" in (out / "release-pr-title-negative.log").read_text()
+run([commitlint, "--config", str(root / "commitlint.config.cjs")], "release-pr-title-positive.log", 0, release_title + "\n")

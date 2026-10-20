@@ -142,3 +142,13 @@ Khi có vendor AGP stable phù hợp: Leader review graph mới và cân nhắc 
 Bổ sung từ full graph: policy exact-GAV cũng áp dụng cho cấu hình tooling `androidLintTool`, vì lint có classpath BC riêng. Không áp dụng rule này lên compile/runtime dependency của app. TestKit kiểm cả buildscript lẫn lint ở root/child; audit toàn bộ cấu hình phải chặn nếu còn bản cũ.
 
 Lượt thử B local 20/10/2026 đã chạy quality/build/lint/R8, 20 test JUnit và smoke API trên classloader AGP thực: BC RSA/X509, JWE nén với kiểm ciphertext sai, JDOM XML lành tính. Scan HIGH/CRITICAL và secret của inventory mở rộng đã pass ở lượt bootstrap. Metadata SHA-256 được tái tạo từ rỗng; chỉ có bộ 5 GAV mới. Gói review phải kèm lượt strict, negative controls, APK ký tạm và kết quả HEAD cuối. Đây chưa phải nghiệm thu: CI GitHub, emulator và tương thích vendor vẫn cần kiểm/duyệt.
+
+### Bootstrap release PR đầu tiên
+
+Release-please dùng tiêu đề `chore(release): release ${version}` để commit và PR sinh ra tuân thủ scope hiện hành. Config release-as chọn version bootstrap, nhưng lịch sử chỉ có ci vẫn bị bỏ qua nếu không có release note. Khi PO/Leader sẵn sàng khởi phát release PR đầu tiên từ squash merge T00b, thêm footer sau vào **commit message squash merge**, không chỉ vào mô tả PR:
+
+```text
+Release-As: 0.1.0-alpha.1
+```
+
+Footer yêu cầu tạo release PR cho version đã duyệt; chưa tạo tag/phát hành. Leader/PO vẫn kiểm secrets, review và merge release PR riêng. Trong release PR đầu tiên, bỏ mục "Pending release" chuẩn bị sẵn khi mục phát hành thực đã được tạo; verifier hỗ trợ cả heading version thường và heading có link do release-please sinh. Nếu chưa sẵn sàng, không thêm footer; pipeline chờ commit feat/fix có nội dung phát hành. Sau bản đầu, Leader gỡ release-as bootstrap và quản lý stage theo DOC-VER. Dev không tự merge hoặc chạy phát hành thật.

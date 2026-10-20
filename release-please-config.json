@@ -18,5 +18,6 @@
       ],
       "prerelease-type": "alpha.1"
     }
-  }
+  },
+  "pull-request-title-pattern": "chore(release): release ${version}"
 }

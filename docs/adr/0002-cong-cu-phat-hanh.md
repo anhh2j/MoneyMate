@@ -38,3 +38,11 @@ verify_release.py chỉ là cổng xác minh độc lập, không phải công c
 - https://docs.github.com/en/actions/how-tos/writing-workflows/choosing-when-your-workflow-runs/triggering-a-workflow — sự kiện từ GITHUB_TOKEN.
 
 Dependency verification và persist-credentials được triển khai theo DOC-BRIEF-M0 v1.5.0 Approved; tài liệu hiện hành giữ nguyên từ main 30056b7.
+
+## Kiểm candidate Release PR
+
+Go strategy thực của release-please17.11.2 đã được thử trong bộ nhớ, không gọi GitHub: tên mặc định chore(main) bị commitlint chặn; pattern chore(release): release ${version} được chấp nhận. Manifest dùng cùng title làm commit message. CI kiểm pattern đã cấu hình qua chính commitlint. Candidate có các updater CHANGELOG.md và version.properties, giữ một assignment version, không tạo version file Go.
+
+Config release-as không tự làm lịch sử ci-only trở thành releaseable. Khi PO/Leader muốn bootstrap từ squash merge T00b, họ thêm footer Release-As: 0.1.0-alpha.1 vào commit squash merge. Candidate khi đó có release note; nếu chưa sẵn sàng thì chờ feat/fix. Changelog updater prepend mục mới nên Leader bỏ mục Pending release cũ trong release PR đầu tiên. Verifier phải nhận cả heading thường ở bản đầu và heading có link ở các bản sau; dry-run kiểm hai dạng và từ chối version khác. Thực thi release PR/tag/phát hành thật vẫn thuộc Leader/PO.
+
+Bằng chứng review được CI đóng gói với source, checksum, bundle, báo cáo và emulator. Baseline graph được tái hiện trong bản sao ngoài repo, chỉ tắt rule/constraints B; không thay metadata hoặc dependency source thật. QA auto result được ghi nguyên trạng trong gói, không đồng nghĩa QA acceptance.
