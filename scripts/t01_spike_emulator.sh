@@ -22,14 +22,6 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
-adb install -r app/build/outputs/apk/debug/app-debug.apk >/dev/null
-adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >/dev/null
-if [ "$api" -ge 33 ]; then adb shell pm grant com.app.moneymate.test android.permission.POST_NOTIFICATIONS; fi
-if [ "$api" -eq 26 ]; then
-  adb shell settings put secure enabled_notification_listeners "$listener"
-else
-  adb shell cmd notification allow_listener "$listener"
-fi
 # Never persist raw diagnostic output. Scan in a private temporary directory, then remove.
 private_dir="$(mktemp -d)"
 on_exit() {
@@ -49,6 +41,23 @@ on_exit() {
   exit "$status"
 }
 trap on_exit EXIT
+if [ "$api" -eq 37 ]; then
+  ready=0
+  for attempt in $(seq 1 15); do
+    if adb shell cmd package list packages com.android.settings > "$private_dir/pm-ready.txt" 2>/dev/null && grep -q 'package:com.android.settings' "$private_dir/pm-ready.txt"; then
+      ready=1
+      break
+    fi
+    sleep 2
+  done
+  test "$ready" -eq 1
+fi
+adb install -r app/build/outputs/apk/debug/app-debug.apk >/dev/null
+adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >/dev/null
+if [ "$api" -ge 33 ]; then adb shell pm grant com.app.moneymate.test android.permission.POST_NOTIFICATIONS; fi
+# Grant only after instrumentation has started: Android 8 can retain a stale binding
+# when an already-bound target is force-stopped by am instrument.
+cleanup
 instrument_status=0
 adb shell am instrument -w -r com.app.moneymate.test/com.app.moneymate.spike.SpikeDeviceInstrumentation > "$private_dir/instrumentation.txt" || instrument_status=$?
 python3 scripts/t01_spike_checks.py --scan "$private_dir/instrumentation.txt"

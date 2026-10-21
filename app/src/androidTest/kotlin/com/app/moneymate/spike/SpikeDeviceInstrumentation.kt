@@ -90,6 +90,11 @@ class SpikeDeviceInstrumentation : Instrumentation() {
                 .setComponent(ComponentName(targetContext, SpikeActivity::class.java))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
+        checkCase(state { session.access == SpikeSession.Access.NOT_GRANTED })
+        click("spike-settings")
+        changeAccess(true)
+        shell("input keyevent 4")
+        waitFor { state { session.access == SpikeSession.Access.GRANTED } }
         click("spike-rebind")
         waitFor { state { session.connected } }
         click("spike-start")
@@ -149,7 +154,14 @@ class SpikeDeviceInstrumentation : Instrumentation() {
                     "cmd notification disallow_listener $listener"
                 }
             }
-        uiAutomation.executeShellCommand(command).close()
+        shell(command)
+    }
+
+    private fun shell(command: String) {
+        val descriptor = uiAutomation.executeShellCommand(command)
+        android.os.ParcelFileDescriptor
+            .AutoCloseInputStream(descriptor)
+            .use { it.readBytes() }
     }
 
     private fun exerciseIsolation() {
