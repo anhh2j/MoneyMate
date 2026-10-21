@@ -7,7 +7,10 @@ import android.os.Build
 import android.provider.Settings
 
 object SpikeNotificationAccess {
-    fun component(context: Context): ComponentName = ComponentName(context, SpikeNotificationListenerService::class.java)
+    fun component(context: Context): ComponentName {
+        val service = SpikeNotificationListenerService::class.java
+        return ComponentName(context, service)
+    }
 
     fun read(context: Context): SpikeSession.Access =
         try {
