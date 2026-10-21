@@ -22,8 +22,10 @@ import androidx.compose.ui.unit.dp
 import com.app.moneymate.R
 import com.app.moneymate.capture.spike.SpikeNotificationListenerService
 
+// Compose Unit-returning functions require uppercase names. Keep both lint systems explicit.
+@Suppress("FunctionNaming", "ktlint:standard:function-naming")
 @Composable
-private fun control(
+private fun Control(
     label: String,
     id: String,
     action: () -> Unit,
@@ -31,9 +33,14 @@ private fun control(
     BasicText(label, Modifier.padding(12.dp).semantics { contentDescription = id }.clickable(onClick = action))
 }
 
-@Suppress("LongMethod") // Single debug screen; raw never enters saved/secondary state.
+// Single debug screen; raw never enters saved state. Uppercase follows Compose naming.
+@Suppress("LongMethod", "FunctionNaming", "ktlint:standard:function-naming")
 @Composable
-fun spikeScreen(context: Context, settings: () -> Boolean, rebind: () -> Unit) {
+fun SpikeScreen(
+    context: Context,
+    settings: () -> Boolean,
+    rebind: () -> Unit,
+) {
     val session = SpikeNotificationListenerService.session
     var revision by remember { mutableIntStateOf(0) }
     DisposableEffect(session) {
@@ -54,17 +61,18 @@ fun spikeScreen(context: Context, settings: () -> Boolean, rebind: () -> Unit) {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(12.dp)) {
         BasicText(stringResource(R.string.spike_warning))
         BasicText(
-            "Access=${session.access}; Connected=${session.connected}; Discovery=${session.discovery}; Payload=${session.payloadEnabled}",
+            "Access=${session.access}; Connected=${session.connected}; " +
+                "Discovery=${session.discovery}; Payload=${session.payloadEnabled}",
         )
         BasicText("Received=${session.received}; Dropped=${session.dropped}; Revision=$revision")
-        control(stringResource(R.string.spike_start), "spike-start", session::start)
-        control(stringResource(R.string.spike_stop), "spike-stop", session::stop)
-        control(stringResource(R.string.spike_clear), "spike-clear", session::clear)
-        control(stringResource(R.string.spike_settings), "spike-settings") { settingsMissing = !settings() }
+        Control(stringResource(R.string.spike_start), "spike-start", session::start)
+        Control(stringResource(R.string.spike_stop), "spike-stop", session::stop)
+        Control(stringResource(R.string.spike_clear), "spike-clear", session::clear)
+        Control(stringResource(R.string.spike_settings), "spike-settings") { settingsMissing = !settings() }
         if (settingsMissing) BasicText(stringResource(R.string.spike_settings_missing))
-        control(stringResource(R.string.spike_rebind), "spike-rebind", rebind)
+        Control(stringResource(R.string.spike_rebind), "spike-rebind", rebind)
         session.packages().forEach { pkg ->
-            control("Package: $pkg", "spike-package-$pkg") {
+            Control("Package: $pkg", "spike-package-$pkg") {
                 if (session.payloadEnabled) {
                     session.consent(emptySet())
                 } else {
@@ -75,23 +83,30 @@ fun spikeScreen(context: Context, settings: () -> Boolean, rebind: () -> Unit) {
         }
         if (consent && chosen != null) {
             BasicText(stringResource(R.string.spike_consent))
-            control(stringResource(R.string.spike_enable), "spike-consent") { session.consent(setOfNotNull(chosen)) }
+            Control(stringResource(R.string.spike_enable), "spike-consent") { session.consent(setOfNotNull(chosen)) }
         }
         if (session.payloadEnabled) {
-            control(stringResource(R.string.spike_hidden), "spike-reveal-request") { revealPrompt = true }
+            Control(stringResource(R.string.spike_hidden), "spike-reveal-request") { revealPrompt = true }
             if (revealPrompt) {
                 BasicText(stringResource(R.string.spike_reveal_warning))
-                control(stringResource(R.string.spike_reveal), "spike-reveal-confirm") { reveal = true }
+                Control(stringResource(R.string.spike_reveal), "spike-reveal-confirm") { reveal = true }
             }
         }
         session.records().filter { chosen == null || chosen == it.packageName }.forEach { record ->
             BasicText("${record.packageName}; ${record.postTime}; truncated=${record.truncated}")
-            control(stringResource(R.string.spike_copy), "spike-copy") {
-                SpikeClipboard.copyMetadata(context, record.packageName, record.postTime, record.receivedAt, record.groupSummary)
+            Control(stringResource(R.string.spike_copy), "spike-copy") {
+                SpikeClipboard.copyMetadata(
+                    context,
+                    record.packageName,
+                    record.postTime,
+                    record.receivedAt,
+                    record.groupSummary,
+                )
             }
             if (reveal && session.payloadEnabled) {
                 BasicText(
-                    "title: ${record.title.orEmpty()}\ntext: ${record.text.orEmpty()}\nbigText: ${record.bigText.orEmpty()}\nsubText: ${record.subText.orEmpty()}",
+                    "title: ${record.title.orEmpty()}\ntext: ${record.text.orEmpty()}\n" +
+                        "bigText: ${record.bigText.orEmpty()}\nsubText: ${record.subText.orEmpty()}",
                 )
             } else {
                 BasicText(stringResource(R.string.spike_hidden))

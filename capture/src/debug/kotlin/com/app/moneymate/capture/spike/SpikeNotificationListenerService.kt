@@ -16,7 +16,7 @@ class SpikeNotificationListenerService : NotificationListenerService() {
                 session.setAccess(SpikeNotificationAccess.read(this@SpikeNotificationListenerService))
                 if (getSystemService(KeyguardManager::class.java).isKeyguardLocked) session.setForeground(false)
                 session.tick()
-                handler.postDelayed(this, 1000)
+                handler.postDelayed(this, TICK_INTERVAL_MS)
             }
         }
 
@@ -53,6 +53,7 @@ class SpikeNotificationListenerService : NotificationListenerService() {
     }
 
     companion object {
+        private const val TICK_INTERVAL_MS = 1000L
         val session = SpikeSession { SystemClock.elapsedRealtime() }
     }
 }

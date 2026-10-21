@@ -18,6 +18,10 @@ adb shell am instrument -w com.app.moneymate.test/com.app.moneymate.spike.SpikeD
 python3 scripts/t01_spike_checks.py --scan "$private_dir/instrumentation.txt"
 grep -q 'ING-01..05 runtime assertions PASS' "$private_dir/instrumentation.txt"
 grep -q 'INSTRUMENTATION_CODE: -1' "$private_dir/instrumentation.txt"
+cp "$private_dir/instrumentation.txt" "$report/instrumentation.txt"
+adb exec-out run-as com.app.moneymate.test cat shared_prefs/probe.xml > "$private_dir/probe.xml"
+python3 scripts/t01_spike_checks.py --scan "$private_dir/probe.xml"
+cp "$private_dir/probe.xml" "$report/external-uid-probe.xml"
 adb logcat -d > "$private_dir/logcat.txt"
 python3 scripts/t01_spike_checks.py --scan "$private_dir/logcat.txt"
 adb exec-out run-as com.app.moneymate tar -cf - . > "$private_dir/storage.tar"
@@ -27,6 +31,7 @@ adb shell am instrument -w -e phase cold com.app.moneymate.test/com.app.moneymat
 python3 scripts/t01_spike_checks.py --scan "$private_dir/cold.txt"
 grep -q 'Cold process state PASS' "$private_dir/cold.txt"
 grep -q 'INSTRUMENTATION_CODE: -1' "$private_dir/cold.txt"
+cp "$private_dir/cold.txt" "$report/cold-process.txt"
 python3 - "$api" "$report" <<'PY'
 import hashlib, json, pathlib, subprocess, sys
 api, report = sys.argv[1], pathlib.Path(sys.argv[2])

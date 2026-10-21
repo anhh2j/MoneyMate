@@ -15,6 +15,8 @@ object SpikeClipboard {
     ) {
         require(packageName.matches(Regex("[A-Za-z0-9_.]+")))
         val metadata = "package=$packageName;postTime=$postTime;receivedAt=$receivedAt;summary=$summary"
-        context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("metadata", metadata))
+        context
+            .getSystemService(ClipboardManager::class.java)
+            .setPrimaryClip(ClipData.newPlainText("metadata", metadata))
     }
 }

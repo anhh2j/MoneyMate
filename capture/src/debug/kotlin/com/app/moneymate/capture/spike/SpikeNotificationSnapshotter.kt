@@ -17,7 +17,8 @@ object SpikeNotificationSnapshotter {
         fun read(key: String): String? {
             val value =
                 try {
-                    @Suppress("DEPRECATION") // Typed Bundle getters can emit framework type warnings; inspect without logging values.
+                    // Avoid typed getter framework warnings for malformed extras.
+                    @Suppress("DEPRECATION")
                     val candidate = extras?.get(key)
                     candidate as? CharSequence
                 } catch (_: BadParcelableException) {

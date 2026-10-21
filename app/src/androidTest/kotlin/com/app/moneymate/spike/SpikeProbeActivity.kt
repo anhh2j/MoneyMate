@@ -24,7 +24,9 @@ class SpikeProbeActivity : Activity() {
 
     private fun publish() {
         val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(NotificationChannel("synthetic", "Synthetic", NotificationManager.IMPORTANCE_DEFAULT))
+        manager.createNotificationChannel(
+            NotificationChannel("synthetic", "Synthetic", NotificationManager.IMPORTANCE_DEFAULT),
+        )
         listOf(2000L, 6000L, 10_000L).forEachIndexed { index, delay ->
             Handler(Looper.getMainLooper()).postDelayed({
                 val notification =
@@ -42,7 +44,11 @@ class SpikeProbeActivity : Activity() {
     }
 
     private fun probe() {
-        val component = ComponentName("com.app.moneymate", "com.app.moneymate.capture.spike.SpikeNotificationListenerService")
+        val component =
+            ComponentName(
+                "com.app.moneymate",
+                "com.app.moneymate.capture.spike.SpikeNotificationListenerService",
+            )
         var bindDenied = false
         var startDenied = false
         val connection =
@@ -71,6 +77,8 @@ class SpikeProbeActivity : Activity() {
             .edit()
             .putBoolean("bindDenied", bindDenied)
             .putBoolean("startDenied", startDenied)
+            .putInt("probeUid", Process.myUid())
+            .putInt("targetUid", targetUid)
             .putBoolean("differentUid", targetUid != Process.myUid())
             .commit()
     }

@@ -32,8 +32,11 @@ class SpikeDeviceInstrumentation : Instrumentation() {
                 result.putString("stream", "Cold process state PASS\n")
             } else {
                 exerciseSnapshot()
+                sendStatus(0, Bundle().apply { putString("case", "ING-01 snapshot null/malformed/limit PASS") })
                 exerciseListener()
+                sendStatus(0, Bundle().apply { putString("case", "ING-02..05 listener/privacy PASS") })
                 exerciseIsolation()
+                sendStatus(0, Bundle().apply { putString("case", "ING-03 external UID bind/start denied PASS") })
                 result.putString("stream", "ING-01..05 runtime assertions PASS\n")
             }
             finish(Activity.RESULT_OK, result)
@@ -68,7 +71,9 @@ class SpikeDeviceInstrumentation : Instrumentation() {
 
     private fun exerciseListener() {
         startActivitySync(
-            Intent().setComponent(ComponentName(targetContext, SpikeActivity::class.java)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            Intent()
+                .setComponent(ComponentName(targetContext, SpikeActivity::class.java))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
         waitFor { session.connected }
         click("spike-start")
@@ -81,7 +86,12 @@ class SpikeDeviceInstrumentation : Instrumentation() {
         checkCase(!containsCanary(uiAutomation.rootInActiveWindow))
         click("spike-reveal-request")
         click("spike-reveal-confirm")
-        waitFor { containsCanary(uiAutomation.rootInActiveWindow) }
+        waitFor {
+            val root = uiAutomation.rootInActiveWindow
+            val visible = containsCanary(root)
+            if (!visible && root != null) scrollForward(root)
+            visible
+        }
         // Copy uses the metadata-only API through the UI, not a synthetic export hook.
         click("spike-copy")
         onMain {
@@ -111,7 +121,8 @@ class SpikeDeviceInstrumentation : Instrumentation() {
     private fun exerciseIsolation() {
         launchProbe("probe")
         waitFor {
-            val descriptor = uiAutomation.executeShellCommand("run-as ${context.packageName} cat shared_prefs/probe.xml")
+            val command = "run-as ${context.packageName} cat shared_prefs/probe.xml"
+            val descriptor = uiAutomation.executeShellCommand(command)
             val result =
                 android.os.ParcelFileDescriptor
                     .AutoCloseInputStream(descriptor)
@@ -137,7 +148,13 @@ class SpikeDeviceInstrumentation : Instrumentation() {
         waitFor {
             val root = uiAutomation.rootInActiveWindow ?: return@waitFor false
             val node = find(root, id)
-            if (node != null) node.performAction(AccessibilityNodeInfo.ACTION_CLICK) else false
+            if (node != null) {
+                node.performAction(AccessibilityNodeInfo.ACTION_SHOW_ON_SCREEN)
+                node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            } else {
+                scrollForward(root)
+                false
+            }
         }
         waitForIdleSync()
     }
@@ -145,21 +162,25 @@ class SpikeDeviceInstrumentation : Instrumentation() {
     private fun find(
         node: AccessibilityNodeInfo,
         id: String,
-    ): AccessibilityNodeInfo? {
-        if (node.contentDescription?.toString() == id) return node
-        for (index in 0 until node.childCount) {
-            val child = node.getChild(index) ?: continue
-            val found = find(child, id)
-            if (found != null) return found
+    ): AccessibilityNodeInfo? =
+        if (node.contentDescription?.toString() == id) {
+            node
+        } else {
+            (0 until node.childCount).firstNotNullOfOrNull { index ->
+                node.getChild(index)?.let { find(it, id) }
+            }
         }
-        return null
+
+    private fun scrollForward(node: AccessibilityNodeInfo): Boolean {
+        if (node.isScrollable && node.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)) return true
+        return (0 until node.childCount).any { index -> node.getChild(index)?.let { scrollForward(it) } == true }
     }
 
-    private fun containsCanary(node: AccessibilityNodeInfo?): Boolean {
-        if (node == null) return false
-        if (node.text?.toString()?.contains(canary()) == true) return true
-        return (0 until node.childCount).any { containsCanary(node.getChild(it)) }
-    }
+    private fun containsCanary(node: AccessibilityNodeInfo?): Boolean =
+        node != null && (
+            node.text?.toString()?.contains(canary()) == true ||
+                (0 until node.childCount).any { containsCanary(node.getChild(it)) }
+        )
 
     private fun waitFor(condition: () -> Boolean) {
         val until = SystemClock.elapsedRealtime() + 20_000
