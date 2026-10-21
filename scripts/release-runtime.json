@@ -1,0 +1,7 @@
+{
+  "version": "17.6.0",
+  "reference_action_sha": "45996ed1f6d02564a971a2fa1b5860e934307cf7",
+  "reference_action_lock": "https://github.com/googleapis/release-please-action/blob/45996ed1f6d02564a971a2fa1b5860e934307cf7/package-lock.json",
+  "package_integrity": "sha512-ItzkkEBeEbKsCrx7N1QlADrCahoONA4WPlsOinSnXTkqUBIWlHC6+S28VJ9PaHy7ZPSJwSQsRuDjI0/HL5G6hw==",
+  "note": "Core package matches the pinned action lock. Workflows now call the exact pinned package directly to normalize candidate files before any write. Transitive packages are locked/audited in this repo; this is not a claim of byte-identical ncc bundle execution."
+}

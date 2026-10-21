@@ -5,6 +5,8 @@
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",
-    "@commitlint/config-conventional": "21.2.4"
+    "@commitlint/config-conventional": "21.2.4",
+    "release-please": "17.6.0",
+    "yaml": "2.9.1"
   }
 }

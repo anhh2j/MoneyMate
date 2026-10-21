@@ -57,6 +57,13 @@ jobs:
         run: |
           python3 scripts/check_docs.py
           python3 -m compileall -q scripts
+      - name: Release bootstrap and publication safety regression (offline, no signing secrets)
+        run: |
+          mkdir -p build/reports/t00c
+          set -o pipefail
+          node --test scripts/tests/release_plan.test.cjs 2>&1 | tee build/reports/t00c/release-plan-tests.log
+          python3 -m unittest discover -s scripts/tests -p 'test_release_*.py' -v 2>&1 | tee build/reports/t00c/release-control-tests.log
+          python3 scripts/release_offline.py 2>&1 | tee build/reports/t00c/bootstrap-dry-run.log
       - name: Build and required checks
         run: |
           mkdir -p build/reports/dod

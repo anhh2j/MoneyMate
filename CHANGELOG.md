@@ -10,8 +10,10 @@
 
 ### Changed
 - Version comes from version.properties; release uses R8 and resource shrinking.
+- T00c: manual candidate planning and separately approved publication; technical merges do not publish.
 
 ### Fixed
+- Q03: QA C07 selftest fixture no longer triggers its own source scan; detection rules unchanged.
 
 ### Security
 - Dependency and secret scan gates; signing material outside the repository.
