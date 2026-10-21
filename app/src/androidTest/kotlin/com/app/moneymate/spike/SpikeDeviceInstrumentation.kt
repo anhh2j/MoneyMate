@@ -149,7 +149,7 @@ class SpikeDeviceInstrumentation : Instrumentation() {
             val root = uiAutomation.rootInActiveWindow ?: return@waitFor false
             val node = find(root, id)
             if (node != null) {
-                node.performAction(AccessibilityNodeInfo.ACTION_SHOW_ON_SCREEN)
+                node.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.id)
                 node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
             } else {
                 scrollForward(root)
