@@ -109,10 +109,9 @@ class SpikeDeviceInstrumentation : Instrumentation() {
                     .orEmpty()
             checkCase(text.contains("package=") && !text.contains(canary()))
         }
-        val listener = "com.app.moneymate/com.app.moneymate.capture.spike.SpikeNotificationListenerService"
-        uiAutomation.executeShellCommand("cmd notification disallow_listener $listener").close()
+        changeAccess(false)
         waitFor { session.access != SpikeSession.Access.GRANTED && session.records().isEmpty() }
-        uiAutomation.executeShellCommand("cmd notification allow_listener $listener").close()
+        changeAccess(true)
         waitFor { session.connected }
         onMain { checkCase(!session.payloadEnabled) }
         click("spike-start")
@@ -121,6 +120,25 @@ class SpikeDeviceInstrumentation : Instrumentation() {
         uiAutomation.executeShellCommand("input keyevent 3").close()
         SystemClock.sleep(500)
         onMain { checkCase(!session.foreground && session.records().all { it.text == null }) }
+    }
+
+    private fun changeAccess(granted: Boolean) {
+        val listener = "com.app.moneymate/com.app.moneymate.capture.spike.SpikeNotificationListenerService"
+        val command =
+            if (android.os.Build.VERSION.SDK_INT == 26) {
+                if (granted) {
+                    "settings put secure enabled_notification_listeners $listener"
+                } else {
+                    "settings delete secure enabled_notification_listeners"
+                }
+            } else {
+                if (granted) {
+                    "cmd notification allow_listener $listener"
+                } else {
+                    "cmd notification disallow_listener $listener"
+                }
+            }
+        uiAutomation.executeShellCommand(command).close()
     }
 
     private fun exerciseIsolation() {
@@ -140,7 +158,7 @@ class SpikeDeviceInstrumentation : Instrumentation() {
     }
 
     private fun launchProbe(mode: String) {
-        context.startActivity(
+        targetContext.startActivity(
             Intent()
                 .setComponent(ComponentName(context.packageName, SpikeProbeActivity::class.java.name))
                 .putExtra("mode", mode)

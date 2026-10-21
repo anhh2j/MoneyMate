@@ -24,3 +24,9 @@ Task T01, baseline `4570e4e3cece382e5a69fa277046628c05f0aa07`. Implementation th
 | Máy thật | ≥2 bank và đủ 6 tình huống theo findings | NOT VERIFIED |
 
 Không tự tuyên bố T01 CLOSED. Không tạo tag/release, bump version hoặc signing secrets. R8 dry-run baseline sử dụng khóa dùng một lần theo workflow hiện hữu, không phát hành thật.
+
+## Blocker ngoài allowlist phát hiện trong CI
+
+CI 39588177473 tại HEAD4d51d67: build/lint/test/security/negative controls/R8 và smoke emulator debug/release đạt, nhưng `scripts/t00b_review_evidence.py:198–200` đòi tổng JUnit đúng20. P-01 thêm6 tests nên tổng26 và packager trả `Unexpected JUnit outcome`. File packager không thuộc23 file được phép; không sửa, không bỏ/giấu test, không thay kết quả để pass. CI tổng thể vẫn FAIL tại bước đóng gói; review package/C07 hậu đóng gói chưa có kết quả. Cần Leader duyệt mở allowlist hoặc giao task riêng cập nhật packager kiểm số test có căn cứ, vẫn fail với thiếu/thừa/skipped/errors/failures.
+
+API37 lần đầu fail trước boot vì action dựng tên platform android-37 trong khi SDK đang dùng android-37.0; đang sửa đúng input và kiểm SDK thực tế, không hạ API. API26 cần shell Settings trên emulator sạch do cmd notification chưa có; đây không phải bằng chứng user-grant qua Settings.

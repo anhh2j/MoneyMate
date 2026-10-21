@@ -73,6 +73,9 @@ jobs:
         with:
           name: t01-build-evidence
           path: .
+      - name: Record target SDK image availability
+        if: matrix.api == 37
+        run: sdkmanager --list | grep -E 'platforms;android-37|system-images;android-37'
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -80,11 +83,11 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
-          api-level: ${{ matrix.api }}
+          api-level: ${{ matrix.api == 37 && '37.0' || matrix.api }}
           arch: x86_64
           target: default
           disable-animations: true
-          script: bash scripts/t01_spike_emulator.sh
+          script: EXPECTED_T01_API=${{ matrix.api }} bash scripts/t01_spike_emulator.sh
       - uses: actions/upload-artifact@v7
         if: always()
         with:

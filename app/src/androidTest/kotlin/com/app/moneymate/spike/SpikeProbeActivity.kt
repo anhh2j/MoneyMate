@@ -18,7 +18,7 @@ import android.os.Process
 class SpikeProbeActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (intent.getStringExtra("mode") == "probe") probe() else publish()
+        if ("probe".equals(intent.getStringExtra("mode"))) probe() else publish()
         finish()
     }
 
@@ -27,19 +27,35 @@ class SpikeProbeActivity : Activity() {
         manager.createNotificationChannel(
             NotificationChannel("synthetic", "Synthetic", NotificationManager.IMPORTANCE_DEFAULT),
         )
-        listOf(2000L, 6000L, 10_000L).forEachIndexed { index, delay ->
-            Handler(Looper.getMainLooper()).postDelayed({
-                val notification =
-                    Notification
-                        .Builder(this, "synthetic")
-                        .setSmallIcon(android.R.drawable.ic_dialog_info)
-                        .setContentTitle("Synthetic title")
-                        .setContentText(listOf("T01", "SYNTHETIC", "CANARY").joinToString("_"))
-                        .setSubText("Synthetic subtext")
-                        .setStyle(Notification.BigTextStyle().bigText("Synthetic expanded"))
-                        .build()
-                manager.notify(index + 1, notification)
-            }, delay)
+        var index = 0
+        while (index < 3) {
+            val id = index + 1
+            val delay = 2000L + index * 4000L
+            Handler(Looper.getMainLooper()).postDelayed(
+                object : Runnable {
+                    override fun run() {
+                        val content =
+                            StringBuilder()
+                                .append("T01")
+                                .append('_')
+                                .append("SYNTHETIC")
+                                .append('_')
+                                .append("CANARY")
+                        val notification =
+                            Notification
+                                .Builder(this@SpikeProbeActivity, "synthetic")
+                                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                                .setContentTitle("Synthetic title")
+                                .setContentText(content)
+                                .setSubText("Synthetic subtext")
+                                .setStyle(Notification.BigTextStyle().bigText("Synthetic expanded"))
+                                .build()
+                        manager.notify(id, notification)
+                    }
+                },
+                delay,
+            )
+            index++
         }
     }
 
@@ -58,7 +74,7 @@ class SpikeProbeActivity : Activity() {
                     service: IBinder,
                 ) = Unit
 
-                override fun onServiceDisconnected(name: ComponentName) = Unit
+                override fun onServiceDisconnected(name: ComponentName?) = Unit
             }
         try {
             val bound = bindService(Intent().setComponent(component), connection, Context.BIND_AUTO_CREATE)

@@ -1,22 +1,46 @@
 #!/usr/bin/env bash
 set -euo pipefail
 api="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
+test "$api" -eq "${EXPECTED_T01_API:-$api}"
 report="build/reports/t01/api-$api"
 mkdir -p "$report"
 listener='com.app.moneymate/com.app.moneymate.capture.spike.SpikeNotificationListenerService'
-cleanup() { adb shell cmd notification disallow_listener "$listener" >/dev/null 2>&1 || true; }
+cleanup() {
+  if [ "$api" -eq 26 ]; then
+    adb shell settings delete secure enabled_notification_listeners >/dev/null 2>&1 || true
+  else
+    adb shell cmd notification disallow_listener "$listener" >/dev/null 2>&1 || true
+  fi
+}
 trap cleanup EXIT
 adb install -r app/build/outputs/apk/debug/app-debug.apk >/dev/null
 adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >/dev/null
 if [ "$api" -ge 33 ]; then adb shell pm grant com.app.moneymate.test android.permission.POST_NOTIFICATIONS; fi
-adb shell cmd notification allow_listener "$listener"
-adb logcat -c
+if [ "$api" -eq 26 ]; then
+  adb shell settings put secure enabled_notification_listeners "$listener"
+else
+  adb shell cmd notification allow_listener "$listener"
+fi
 # Never persist raw diagnostic output. Scan in a private temporary directory, then remove.
 private_dir="$(mktemp -d)"
-trap 'cleanup; rm -rf "$private_dir"' EXIT
-adb shell am instrument -w com.app.moneymate.test/com.app.moneymate.spike.SpikeDeviceInstrumentation > "$private_dir/instrumentation.txt"
+on_exit() {
+  status=$?
+  if [ "$status" -ne 0 ]; then
+    adb logcat -d -s AndroidRuntime:E > "$private_dir/crash.txt" 2>/dev/null || true
+    if python3 scripts/t01_spike_checks.py --scan "$private_dir/crash.txt"; then
+      cp "$private_dir/crash.txt" "$report/crash-sanitized.txt"
+    fi
+  fi
+  cleanup
+  rm -rf "$private_dir"
+  exit "$status"
+}
+trap on_exit EXIT
+instrument_status=0
+adb shell am instrument -w com.app.moneymate.test/com.app.moneymate.spike.SpikeDeviceInstrumentation > "$private_dir/instrumentation.txt" || instrument_status=$?
 python3 scripts/t01_spike_checks.py --scan "$private_dir/instrumentation.txt"
 cp "$private_dir/instrumentation.txt" "$report/instrumentation.txt"
+test "$instrument_status" -eq 0
 grep -q 'ING-01..05 runtime assertions PASS' "$private_dir/instrumentation.txt"
 grep -q 'INSTRUMENTATION_CODE: -1' "$private_dir/instrumentation.txt"
 adb exec-out run-as com.app.moneymate.test cat shared_prefs/probe.xml > "$private_dir/probe.xml"
