@@ -44,6 +44,16 @@ class SpikeDeviceInstrumentation : Instrumentation() {
             }
             finish(Activity.RESULT_OK, result)
         } catch (_: AssertionError) {
+            onMain {
+                result.putString("access", session.access.name)
+                result.putBoolean("connected", session.connected)
+                result.putBoolean("foreground", session.foreground)
+                result.putInt("recordCount", session.records().size)
+                val keyguard = targetContext.getSystemService(android.app.KeyguardManager::class.java)
+                result.putBoolean("keyguardLocked", keyguard.isKeyguardLocked)
+                val manager = targetContext.getSystemService(android.app.ActivityManager::class.java)
+                result.putBoolean("lowRamDevice", manager.isLowRamDevice)
+            }
             result.putString("stream", "FAIL: $stage assertion; payload omitted\n")
             finish(Activity.RESULT_CANCELED, result)
         } catch (_: RuntimeException) {
@@ -182,6 +192,8 @@ class SpikeDeviceInstrumentation : Instrumentation() {
             }
         }
         waitForIdleSync()
+        stage = "$id-complete"
+        sendStatus(0, Bundle().apply { putString("step", stage) })
     }
 
     private fun find(

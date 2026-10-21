@@ -1,11 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
+qemu="$(adb shell getprop ro.kernel.qemu | tr -d '\r')"
+if [ "$qemu" != 1 ] && [ "$(adb shell getprop ro.boot.qemu | tr -d '\r')" != 1 ]; then
+  echo 'FAIL: synthetic test APK is restricted to emulators' >&2
+  exit 2
+fi
 api="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
 test "$api" -eq "${EXPECTED_T01_API:-$api}"
 report="build/reports/t01/api-$api"
 mkdir -p "$report"
 adb shell getprop ro.config.low_ram > "$report/low-ram-property.txt"
 adb shell getprop ro.build.fingerprint > "$report/fingerprint.txt"
+adb shell df -k /data > "$report/data-space.txt"
+adb shell input keyevent 82
 listener='com.app.moneymate/com.app.moneymate.capture.spike.SpikeNotificationListenerService'
 cleanup() {
   if [ "$api" -eq 26 ]; then
@@ -29,6 +36,10 @@ on_exit() {
   status=$?
   if [ "$status" -ne 0 ]; then
     adb logcat -d -s AndroidRuntime:E > "$private_dir/crash.txt" 2>/dev/null || true
+    adb shell dumpsys notification | python3 -c 'import sys; [print(line.rstrip()) for line in sys.stdin if "com.app.moneymate.capture.spike.SpikeNotificationListenerService" in line]' > "$private_dir/binding.txt" || true
+    if python3 scripts/t01_spike_checks.py --scan "$private_dir/binding.txt"; then
+      cp "$private_dir/binding.txt" "$report/binding-metadata.txt"
+    fi
     if python3 scripts/t01_spike_checks.py --scan "$private_dir/crash.txt"; then
       cp "$private_dir/crash.txt" "$report/crash-sanitized.txt"
     fi
