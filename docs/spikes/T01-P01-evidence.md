@@ -36,3 +36,37 @@ API37 lần đầu fail trước boot vì action dựng tên platform android-37
 Tại HEAD `24354085394c034abd4378248005ff0c28e211c5`, workflow T01 run `39593979913` đạt đầy đủ các job API26/29/33/35: callback thật, consent/reveal UI, metadata-only clipboard, revoke/regrant, external UID deny, canary log/disk/evidence và cold process. Grant được thực hiện sau khi instrumentation khởi động, qua mở Settings/quay về app; shell grant không thay xác nhận thao tác cấp quyền bằng người dùng trên máy thật.
 
 API37 boot đúng `android-37.0;google_apis;x86_64`, đủ dung lượng data, nhưng cài test APK gặp `Broken pipe (32)`; log có crash launcher hệ thống trước khi test app chạy. Chưa có runtime PASS API37. Lượt chốt thử renderer `software` và cài APK không streaming; không hạ SDK, không đổi exported/binding permission, không bỏ assertions. Căn cứ cấu hình renderer: https://developer.android.com/studio/run/emulator-acceleration (software mode; swiftshader_indirect đã deprecated). Nếu không có bằng chứng runtime an toàn thì giữ NOT VERIFIED/BLOCKED.
+# P01-B01 scoped packager compatibility follow-up
+
+Leader authorized `scripts/t00b_review_evidence.py` as the 24th path on
+2026-10-21. This supersedes the earlier outside-allowlist blocker below.
+No other path is added; Approved documents and QA tools/tests remain unchanged.
+
+The packager derives JUnit identities from the source extracted from the reviewed
+Git HEAD, independently of uploaded XML. The current root CI task contract is
+Android `testDebugUnitTest` (`src/test` + `src/testDebug`) and JVM/build-logic
+`test` (`src/test`). Unknown plugins, languages, source sets, non-plain JUnit4
+declarations, missing modules and unexpected variants fail closed and require
+contract review. This is a deliberately restricted inventory reader, not a
+general Kotlin/JUnit parser or a fixed/minimum test count.
+
+`review/junit-inventory.json` records every module/task/class/method, declaring
+source set/path/SHA-256 and XML path/SHA-256. Suite counts/names/file names and
+testcase identities must agree exactly. Every failure/error/skip, including
+testcase children hidden by forged zero counters, is rejected.
+
+`review/junit-negative-controls.json` records rejection of missing, extra,
+duplicate, skipped, failed, error and wrong-variant cases using disposable copies
+of the actual uploaded XML. Original evidence hashes are checked unchanged.
+The developer checker suite also covers missing modules, duplicate XML files,
+known wrong variants, forged counters/suite names, malformed/relocated XML,
+unsupported source sets and duplicate source declarations (16 Python tests in
+total, including the existing P-01 controls).
+
+Source-tree/checksum, installed debug/R8 hash, emulator launch, security scanner,
+Git bundle restore and the unchanged QA/C07 invocation retain their original
+logic. Final CI/artifact/QA findings are reported in the Draft PR and handover;
+successful packaging alone is not QA acceptance. API37 and real-device findings
+remain independently qualified; this fix does not turn prior unverified results
+into PASS. APK pair provenance/emulator-only publisher and privacy scan scope
+remain as documented below.
