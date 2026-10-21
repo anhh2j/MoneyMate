@@ -48,7 +48,7 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Plan with release-please 17.6.0, GET-only snapshot
         run: python3 scripts/release_control.py plan --sha "$SOURCE_SHA" --version "$RELEASE_VERSION"
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: release-candidate-plan
           path: build/reports/release-candidate/

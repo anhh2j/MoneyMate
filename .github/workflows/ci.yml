@@ -92,7 +92,7 @@ jobs:
         run: python3 scripts/t00b_review_evidence.py graph --tools "$RUNNER_TEMP/moneymate-tools"
       - name: Upload reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: test-lint-dod-reports
           path: |
@@ -102,13 +102,13 @@ jobs:
             app/build/intermediates/merged_manifest/**
           if-no-files-found: error
       - name: Upload debug APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Upload disposable signed R8 APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: release-dry-run-apk
           path: |
@@ -157,7 +157,7 @@ jobs:
             bash .github/emulator_smoke.sh apk-release/app-release.apk release-r8
       - name: Upload emulator evidence
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: emulator-evidence
           path: build/reports/emulator/
@@ -175,7 +175,7 @@ jobs:
           REVIEW_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: python3 scripts/t00b_review_evidence.py package --tools "$RUNNER_TEMP/moneymate-review-tools" --reports "$RUNNER_TEMP/review-build-reports" --output "$RUNNER_TEMP/t00b-review"
       - name: Upload review package
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: source-review-package
           path: ${{ runner.temp }}/MoneyMate_T00b_REVIEW_*.zip*
