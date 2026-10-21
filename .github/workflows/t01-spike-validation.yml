@@ -94,6 +94,7 @@ jobs:
           target: ${{ matrix.api == 37 && 'google_apis' || 'default' }}
           ram-size: ${{ matrix.api == 37 && '4096M' || '2048M' }}
           disk-size: 6G
+          emulator-options: ${{ matrix.api == 37 && '-no-window -gpu software -no-snapshot -noaudio -no-boot-anim' || '-no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim' }}
           disable-animations: true
           script: EXPECTED_T01_API=${{ matrix.api }} bash scripts/t01_spike_emulator.sh
       - uses: actions/upload-artifact@v7

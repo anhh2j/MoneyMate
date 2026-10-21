@@ -30,3 +30,9 @@ Không tự tuyên bố T01 CLOSED. Không tạo tag/release, bump version hoặ
 CI 39588177473 tại HEAD4d51d67: build/lint/test/security/negative controls/R8 và smoke emulator debug/release đạt, nhưng `scripts/t00b_review_evidence.py:198–200` đòi tổng JUnit đúng20. P-01 thêm6 tests nên tổng26 và packager trả `Unexpected JUnit outcome`. File packager không thuộc23 file được phép; không sửa, không bỏ/giấu test, không thay kết quả để pass. CI tổng thể vẫn FAIL tại bước đóng gói; review package/C07 hậu đóng gói chưa có kết quả. Cần Leader duyệt mở allowlist hoặc giao task riêng cập nhật packager kiểm số test có căn cứ, vẫn fail với thiếu/thừa/skipped/errors/failures.
 
 API37 lần đầu fail trước boot vì action dựng tên platform android-37 trong khi SDK đang dùng android-37.0; đang sửa đúng input và kiểm SDK thực tế, không hạ API. API26 cần shell Settings trên emulator sạch do cmd notification chưa có; đây không phải bằng chứng user-grant qua Settings.
+
+## Runtime đã xác minh trước lượt chốt
+
+Tại HEAD `24354085394c034abd4378248005ff0c28e211c5`, workflow T01 run `39593979913` đạt đầy đủ các job API26/29/33/35: callback thật, consent/reveal UI, metadata-only clipboard, revoke/regrant, external UID deny, canary log/disk/evidence và cold process. Grant được thực hiện sau khi instrumentation khởi động, qua mở Settings/quay về app; shell grant không thay xác nhận thao tác cấp quyền bằng người dùng trên máy thật.
+
+API37 boot đúng `android-37.0;google_apis;x86_64`, đủ dung lượng data, nhưng cài test APK gặp `Broken pipe (32)`; log có crash launcher hệ thống trước khi test app chạy. Chưa có runtime PASS API37. Lượt chốt thử renderer `software` và cài APK không streaming; không hạ SDK, không đổi exported/binding permission, không bỏ assertions. Căn cứ cấu hình renderer: https://developer.android.com/studio/run/emulator-acceleration (software mode; swiftshader_indirect đã deprecated). Nếu không có bằng chứng runtime an toàn thì giữ NOT VERIFIED/BLOCKED.

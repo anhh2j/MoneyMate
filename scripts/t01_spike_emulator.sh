@@ -52,8 +52,13 @@ if [ "$api" -eq 37 ]; then
   done
   test "$ready" -eq 1
 fi
-adb install -r app/build/outputs/apk/debug/app-debug.apk >/dev/null
-adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >/dev/null
+if [ "$api" -eq 37 ]; then
+  adb install --no-streaming -r app/build/outputs/apk/debug/app-debug.apk >/dev/null
+  adb install --no-streaming -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >/dev/null
+else
+  adb install -r app/build/outputs/apk/debug/app-debug.apk >/dev/null
+  adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >/dev/null
+fi
 if [ "$api" -ge 33 ]; then adb shell pm grant com.app.moneymate.test android.permission.POST_NOTIFICATIONS; fi
 # Grant only after instrumentation has started: Android 8 can retain a stale binding
 # when an already-bound target is force-stopped by am instrument.
