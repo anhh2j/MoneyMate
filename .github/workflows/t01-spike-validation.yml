@@ -1,0 +1,135 @@
+name: T01 Spike Validation
+
+on:
+  pull_request:
+
+permissions: {}
+
+concurrency:
+  group: t01-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          cmdline-tools-version: 13114758
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
+        with:
+          validate-wrappers: true
+      - run: sdkmanager "platforms;android-37.0" "build-tools;37.0.0"
+      - name: Validate workflow expressions and experiment matrix
+        run: |
+          set -euo pipefail
+          mkdir -p build/reports/t01
+          tools_dir="$(mktemp -d)"
+          trap 'rm -rf "$tools_dir"' EXIT
+          curl --fail --silent --show-error --location --retry 3 https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz -o "$tools_dir/actionlint.tar.gz"
+          printf '%s  %s\n' 023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757 "$tools_dir/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf "$tools_dir/actionlint.tar.gz" -C "$tools_dir" actionlint
+          "$tools_dir/actionlint" -shellcheck= -pyflakes= .github/workflows/t01-spike-validation.yml 2>&1 | tee build/reports/t01/workflow-expressions.txt
+          bash -n scripts/t01_spike_emulator.sh
+          python3 - <<'PY'
+          import json, pathlib, re
+          source = pathlib.Path('.github/workflows/t01-spike-validation.yml').read_text()
+          assert 'api: [26, 29, 33, 35, 37]' in source
+          assert 'experiment: [baseline]' in source
+          extras = re.findall(r'- api: (\d+)\s+experiment: (\w+)', source)
+          assert extras == [('37', 'swiftshader'), ('37', 'playstore')]
+          cells = [{'api': api, 'experiment': 'baseline'} for api in (26, 29, 33, 35, 37)]
+          cells += [{'api': int(api), 'experiment': label} for api, label in extras]
+          pathlib.Path('build/reports/t01/matrix.json').write_text(json.dumps(cells, indent=2) + '\n')
+          print('PASS: actionlint expressions, bash syntax, five baseline + two experimental cells')
+          PY
+      - name: Check formatting with pinned verified tool
+        run: ./gradlew --dependency-verification strict ktlintCheck --console=plain
+      - name: Build test artifacts with strict verification
+        if: always()
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_t01_spike_checks.py' -v
+          set -o pipefail
+          mkdir -p build/reports/t01
+          ./gradlew --dependency-verification strict :capture:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease lintDebug lintRelease verifyModuleGraph --console=plain 2>&1 | tee build/reports/t01/build.log
+          python3 scripts/t01_spike_checks.py
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: t01-build-evidence
+          path: |
+            app/build/outputs/apk/
+            **/build/test-results/
+            **/build/reports/
+          if-no-files-found: error
+  runtime:
+    name: ${{ matrix.experiment == 'baseline' && format('runtime ({0})', matrix.api) || format('runtime ({0}, {1})', matrix.api, matrix.experiment) }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [26, 29, 33, 35, 37]
+        experiment: [baseline]
+        include:
+          - api: 37
+            experiment: swiftshader
+          - api: 37
+            experiment: playstore
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/download-artifact@v6
+        with:
+          name: t01-build-evidence
+          path: .
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        if: matrix.api == 37
+        with:
+          cmdline-tools-version: 13114758
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - name: Record target SDK image availability
+        if: matrix.api == 37
+        run: sdkmanager --list | grep -E 'platforms;android-37|system-images;android-37'
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: ${{ matrix.api == 37 && '37.0' || matrix.api }}
+          arch: x86_64
+          target: ${{ matrix.experiment == 'playstore' && 'google_apis_playstore' || (matrix.api == 37 && 'google_apis' || 'default') }}
+          ram-size: ${{ matrix.api == 37 && '4096M' || '2048M' }}
+          disk-size: 6G
+          emulator-options: ${{ matrix.api == 37 && (matrix.experiment == 'swiftshader' && '-no-window -gpu swiftshader -no-snapshot -noaudio -no-boot-anim' || '-no-window -gpu software -no-snapshot -noaudio -no-boot-anim') || '-no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim' }}
+          disable-animations: true
+          script: EXPECTED_T01_API=${{ matrix.api }} T01_EXPERIMENT=${{ matrix.experiment }} T01_IMAGE_TARGET=${{ matrix.experiment == 'playstore' && 'google_apis_playstore' || (matrix.api == 37 && 'google_apis' || 'default') }} T01_GPU_MODE=${{ matrix.api == 37 && (matrix.experiment == 'swiftshader' && 'swiftshader' || 'software') || 'swiftshader_indirect' }} bash scripts/t01_spike_emulator.sh
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: t01-runtime-api-${{ matrix.api }}${{ matrix.experiment != 'baseline' && format('-{0}', matrix.experiment) || '' }}
+          path: build/reports/t01/
+          if-no-files-found: error

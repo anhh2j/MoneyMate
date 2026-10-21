@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <queries><package android:name="com.app.moneymate" /></queries>
+  <application>
+    <activity android:name="com.app.moneymate.spike.SpikeProbeActivity" android:exported="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+  </application>
+</manifest>

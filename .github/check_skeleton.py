@@ -57,17 +57,9 @@ for module in ("app", "core-model", "capture", "data", "privacy", "security", "p
     tests = list((ROOT / module / "src/test").rglob("*.kt"))
     smoke = [path for path in tests if path.name == "ModuleSmokeTest.kt"]
     assert len(smoke) == 1 and smoke[0].read_text().count("@Test") == 1, module
-    expected = sum(path.read_text().count("@Test") for path in tests)
-    assert expected >= (2 if module == "app" else 1), module
-    xmls = list((ROOT / module / "build/test-results").rglob("TEST-*.xml"))
-    assert xmls, f"No executed test results: {module}"
-    executed = 0
-    for xml in xmls:
-        suite = ET.parse(xml).getroot()
-        assert int(suite.get("tests", 0)) > 0, xml
-        executed += int(suite.get("tests", 0))
-        assert all(int(suite.get(field, 0)) == 0 for field in ("failures", "errors", "skipped")), xml
-    assert executed == expected, (module, executed, expected)
+    # Developer-owned variant-aware check: every source test must execute, including testDebug.
+    from t01_spike_checks import verify_junit
+    verify_junit(ROOT / module)
 passed("all nine smoke tests and all declared app metadata tests executed without failure/error/skip")
 (REPORT / "skeleton-checks.txt").write_text("\n".join(results) + "\n")
 

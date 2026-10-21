@@ -12,6 +12,7 @@ android {
         applicationId = "com.app.moneymate"
         minSdk = 26
         targetSdk = 37
+        testInstrumentationRunner = "com.app.moneymate.spike.SpikeDeviceInstrumentation"
     }
     buildFeatures { compose = true }
     compileOptions {

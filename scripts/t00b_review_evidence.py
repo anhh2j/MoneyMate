@@ -148,6 +148,136 @@ def compare_graphs(tools):
     print("PASS: independent before/after graphs, exact five-GAV delta, full SBOM coverage, actual JARs and scans")
 
 
+def junit_contract(source, modules=None):
+    """Root CI contract: JVM test, Android debug unit test; never infer from XML."""
+    contract = {}
+    for module in modules or [*MODULES, "build-logic"]:
+        project = source / module
+        build = (project / "build.gradle.kts").read_text()
+        android = bool(re.search(r"alias\(libs\.plugins\.android\.(application|library)\)", build))
+        if not android and not ("alias(libs.plugins.kotlin.jvm)" in build or "`kotlin-dsl`" in build):
+            raise RuntimeError("Unsupported JUnit module plugin: " + module)
+        task = "testDebugUnitTest" if android else "test"
+        sets = {"test", "testDebug"} if android else {"test"}
+        expected = {}
+        # This deliberately supports the repository's plain JUnit4 Kotlin tests only.
+        # New source sets, runners, inheritance or annotation layouts need review,
+        # rather than silently reducing the expected inventory.
+        for folder in sorted((project / "src").glob("test*")):
+            files = sorted(p for p in folder.rglob("*") if p.suffix in {".kt", ".java", ".kts"})
+            if files and folder.name not in sets:
+                raise RuntimeError("Unsupported unit-test source set: " + str(folder.relative_to(source)))
+            for path in files:
+                if path.suffix != ".kt":
+                    raise RuntimeError("Unsupported unit-test language")
+                text = path.read_text()
+                # Mask literals/comments so fixture strings cannot declare tests/classes.
+                pattern = r'"""[\s\S]*?"""|"(?:\\.|[^"\\])*"|\x27(?:\\.|[^\x27\\])*\x27|//[^\n]*|/\*[\s\S]*?\*/'
+                code = re.sub(pattern, lambda m: re.sub(r"[^\n]", " ", m.group()), text)
+                packages = re.findall(r"^package ([\w.]+)\s*$", code, re.M)
+                classes = re.findall(r"\bclass\s+(\w+)", code)
+                methods = re.findall(r"@Test\s+fun\s+(\w+)\(\s*\)", code)
+                if len(packages) != 1 or len(classes) != 1 or not methods or len(methods) != code.count("@Test"):
+                    raise RuntimeError("Unsupported JUnit declaration: " + str(path.relative_to(source)))
+                if re.search(r"@(?:Ignore|RunWith)|\bclass\s+\w+\s*[:(]", code):
+                    raise RuntimeError("Unsupported JUnit runner/inheritance/ignore")
+                for method in methods:
+                    key = (packages[0] + "." + classes[0], method)
+                    if key in expected:
+                        raise RuntimeError("Duplicate source test identity")
+                    expected[key] = {"source": str(path.relative_to(source)), "source_set": folder.name,
+                                     "source_sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+        if not expected:
+            raise RuntimeError("Missing declared unit tests: " + module)
+        contract[(module, task)] = expected
+    return contract
+
+
+def verify_review_junit(source, reports, modules=None):
+    contract = junit_contract(source, modules)
+    actual = {key: {} for key in contract}
+    xmls = sorted(reports.rglob("TEST-*.xml"))
+    for path in xmls:
+        parts = path.relative_to(reports).parts
+        if len(parts) != 5 or parts[1:3] != ("build", "test-results"):
+            raise RuntimeError("Unexpected JUnit XML path")
+        group = (parts[0], parts[3])
+        if group not in contract:
+            raise RuntimeError("Unexpected JUnit module/variant")
+        suite = ET.parse(path).getroot()
+        cases = suite.findall("testcase")
+        if suite.tag != "testsuite" or not cases or suite.get("tests") != str(len(cases)):
+            raise RuntimeError("Invalid JUnit suite/count")
+        if any(suite.get(k) != "0" for k in ("failures", "errors", "skipped")):
+            raise RuntimeError("Unsuccessful JUnit suite")
+        if any(child.tag not in {"properties", "testcase", "system-out", "system-err"} for child in suite):
+            raise RuntimeError("Unexpected JUnit suite content")
+        for case in cases:
+            key = (case.get("classname"), case.get("name"))
+            if list(case) or case.get("status", "run") != "run":
+                raise RuntimeError("Unsuccessful JUnit testcase")
+            if key not in contract[group] or key in actual[group]:
+                raise RuntimeError("Extra/duplicate/wrong-variant JUnit identity")
+            if suite.get("name") != key[0] or path.name != "TEST-" + key[0] + ".xml":
+                raise RuntimeError("JUnit suite/class/file mismatch")
+            actual[group][key] = str(path.relative_to(reports))
+    entries = []
+    for group, expected in contract.items():
+        if set(actual[group]) != set(expected):
+            raise RuntimeError("Missing JUnit tests/module/variant")
+        for key, declaration in sorted(expected.items()):
+            entries.append({"module": group[0], "task": group[1], "class": key[0], "method": key[1],
+                            **declaration, "xml": actual[group][key]})
+    return {"status": "PASS", "totals": {"tests": len(entries), "failures": 0, "errors": 0, "skipped": 0},
+            "tests": entries, "xml_sha256": {str(p.relative_to(reports)): hashlib.sha256(p.read_bytes()).hexdigest() for p in xmls}}
+
+
+def junit_negative_controls(source, reports, modules=None):
+    """Mutate disposable XML copies; original evidence/source is never modified."""
+    baseline = verify_review_junit(source, reports, modules)
+    outcomes = {}
+    for control in ("missing", "extra", "duplicate", "skipped", "failed", "error", "wrong-variant"):
+        with tempfile.TemporaryDirectory(prefix="moneymate-junit-control-") as directory:
+            copy = pathlib.Path(directory)
+            for name in baseline["xml_sha256"]:
+                target = copy / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(reports / name, target)
+            path = copy / next(iter(baseline["xml_sha256"]))
+            tree = ET.parse(path)
+            suite = tree.getroot()
+            case = suite.find("testcase")
+            if control == "missing":
+                suite.remove(case)
+                suite.set("tests", str(len(suite.findall("testcase"))))
+            elif control in {"extra", "duplicate"}:
+                added = ET.fromstring(ET.tostring(case))
+                if control == "extra":
+                    added.set("name", "undeclaredNegativeControl")
+                suite.append(added)
+                suite.set("tests", str(len(suite.findall("testcase"))))
+            elif control == "wrong-variant":
+                wrong = path.parent.parent / "testUnapprovedUnitTest" / path.name
+                wrong.parent.mkdir()
+                path.rename(wrong)
+            else:
+                # Keep suite counters forged at zero: testcase children must fail too.
+                ET.SubElement(case, {"failed": "failure", "error": "error", "skipped": "skipped"}[control])
+            if control != "wrong-variant":
+                tree.write(path)
+            try:
+                verify_review_junit(source, copy, modules)
+            except (RuntimeError, ET.ParseError):
+                outcomes[control] = "REJECTED"
+            else:
+                raise RuntimeError("JUnit negative control accepted: " + control)
+    restored = verify_review_junit(source, reports, modules)
+    if restored != baseline:
+        raise RuntimeError("JUnit controls modified original evidence")
+    return {"status": "PASS", "controls": outcomes, "original_xml_unchanged": True,
+            "baseline_tests": baseline["totals"]["tests"], "baseline_xml_sha256": baseline["xml_sha256"]}
+
+
 def package_review(args):
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -194,10 +324,12 @@ def package_review(args):
             raise RuntimeError("Missing launch success")
         if not any(n.get("text") == "MoneyMate" and n.get("package") == "com.app.moneymate" for n in ET.parse(evidence / "window.xml").getroot().iter()):
             raise RuntimeError("MoneyMate not visible")
-    junit = [ET.parse(p).getroot() for p in (review / "artifacts").rglob("TEST-*.xml")]
-    totals = {key: sum(int(x.get(key, 0)) for x in junit) for key in ["tests", "failures", "errors", "skipped"]}
-    if totals != {"tests": 20, "failures": 0, "errors": 0, "skipped": 0}:
-        raise RuntimeError("Unexpected JUnit outcome")
+    junit = verify_review_junit(source, review / "artifacts")
+    dump(review / "junit-inventory.json", junit)
+    controls = junit_negative_controls(source, review / "artifacts")
+    dump(review / "junit-negative-controls.json", controls)
+    totals = junit["totals"]
+    print("JUNIT_INVENTORY " + json.dumps({"totals": totals, "negative_controls": controls["controls"]}), flush=True)
     exits = {}
     with tempfile.TemporaryDirectory(prefix="moneymate-review-git-") as directory:
         gitdir = pathlib.Path(directory) / "refs.git"

@@ -1,0 +1,16 @@
+<resources>
+  <string name="spike_name">MoneyMate Spike</string>
+  <string name="spike_warning">Spike nội bộ — chỉ RAM — không tạo giao dịch. Không sao chép, xuất hoặc chia sẻ nội dung thông báo.</string>
+  <string name="spike_start">Bắt đầu khám phá metadata</string>
+  <string name="spike_stop">Dừng và xóa phiên</string>
+  <string name="spike_clear">Xóa tất cả</string>
+  <string name="spike_settings">Mở cài đặt Notification access</string>
+  <string name="spike_settings_missing">Hãy mở Cài đặt hệ thống → Quyền truy cập thông báo. Không thể tự cấp quyền.</string>
+  <string name="spike_consent">Xác nhận đọc nội dung: chỉ package đã chọn, chỉ khi màn hình này đang mở, tối đa 5 phút. Nội dung chỉ RAM, bị xóa khi rời màn hình.</string>
+  <string name="spike_enable">Xác nhận bật đọc nội dung</string>
+  <string name="spike_reveal_warning">Nội dung tài chính nhạy cảm. Chỉ xem trên máy; không chụp, sao chép hay chia sẻ.</string>
+  <string name="spike_reveal">Xác nhận xem raw</string>
+  <string name="spike_hidden">Nội dung đã che</string>
+  <string name="spike_copy">Copy metadata</string>
+  <string name="spike_rebind">Kết nối lại</string>
+</resources>
