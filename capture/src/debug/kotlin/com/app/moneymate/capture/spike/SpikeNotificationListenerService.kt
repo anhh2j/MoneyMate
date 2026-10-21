@@ -10,14 +10,15 @@ import android.service.notification.StatusBarNotification
 
 class SpikeNotificationListenerService : NotificationListenerService() {
     private val handler = Handler(Looper.getMainLooper())
-    private val tick = object : Runnable {
-        override fun run() {
-            session.setAccess(SpikeNotificationAccess.read(this@SpikeNotificationListenerService))
-            if (getSystemService(KeyguardManager::class.java).isKeyguardLocked) session.setForeground(false)
-            session.tick()
-            handler.postDelayed(this, 1000)
+    private val tick =
+        object : Runnable {
+            override fun run() {
+                session.setAccess(SpikeNotificationAccess.read(this@SpikeNotificationListenerService))
+                if (getSystemService(KeyguardManager::class.java).isKeyguardLocked) session.setForeground(false)
+                session.tick()
+                handler.postDelayed(this, 1000)
+            }
         }
-    }
 
     override fun onListenerConnected() {
         session.setAccess(SpikeNotificationAccess.read(this))
@@ -34,10 +35,13 @@ class SpikeNotificationListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         session.setAccess(SpikeNotificationAccess.read(this))
         if (getSystemService(KeyguardManager::class.java).isKeyguardLocked) session.setForeground(false)
-        val metadata = RawNotification(
-            sbn.packageName, sbn.postTime, System.currentTimeMillis(),
-            sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0,
-        )
+        val metadata =
+            RawNotification(
+                sbn.packageName,
+                sbn.postTime,
+                System.currentTimeMillis(),
+                sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0,
+            )
         session.receive(metadata) { SpikeNotificationSnapshotter.snapshot(metadata, sbn.notification.extras) }
     }
 

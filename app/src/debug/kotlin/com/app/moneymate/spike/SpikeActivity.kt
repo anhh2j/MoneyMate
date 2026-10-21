@@ -16,7 +16,7 @@ class SpikeActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         // Ignore all incoming extras/URI. No external intent can start a session or consent.
-        setContent { SpikeScreen(this, ::openSettings, ::rebind) }
+        setContent { spikeScreen(this, ::openSettings, ::rebind) }
     }
 
     override fun onResume() {

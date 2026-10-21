@@ -1,6 +1,7 @@
 """Negative controls for the developer-owned P-01 checker, not QA policy."""
 import importlib.util
 import pathlib
+import shutil
 import tempfile
 import unittest
 import zipfile
@@ -45,6 +46,7 @@ class SpikeChecksTest(unittest.TestCase):
         self.module(group="unexpected")
         with self.assertRaises(AssertionError):
             CHECKS.verify_junit(self.root)
+        shutil.rmtree(self.root / "build/test-results/unexpected")
         self.module()
         debug = self.root / "src/testDebug/Extra.kt"
         debug.parent.mkdir(parents=True)

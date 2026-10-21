@@ -10,8 +10,11 @@ import org.junit.Test
 class SpikeSessionTest {
     private var now = 0L
     private val session = SpikeSession { now }
+
     private fun metadata() = RawNotification("test.publisher", 10, 20, false)
+
     private fun send() = session.receive(metadata()) { RawNotification("test.publisher", 10, 20, false, text = "synthetic") }
+
     private fun ready() {
         session.setAccess(SpikeSession.Access.GRANTED)
         session.setConnection(true)
@@ -25,6 +28,7 @@ class SpikeSessionTest {
         ready()
         assertNull(session.records().last().text)
         assertTrue(session.consent(setOf("test.publisher")))
+        session.receive(RawNotification("other.publisher", 1, 2, false)) { throw AssertionError("extras must not be read") }
         send()
         assertEquals("synthetic", session.records().last().text)
         assertFalse(session.consent(setOf("unknown.publisher")))
@@ -70,7 +74,10 @@ class SpikeSessionTest {
             session.receive(metadata()) { RawNotification("test.publisher", 1, 2, false, text = "x".repeat(16_384)) }
         }
         assertTrue(session.records().sumOf { it.textBytes() } <= SpikeSession.MAX_BYTES)
-        session.receive(metadata()) { session.clear(); RawNotification("test.publisher", 1, 2, false, text = "stale") }
+        session.receive(metadata()) {
+            session.clear()
+            RawNotification("test.publisher", 1, 2, false, text = "stale")
+        }
         assertTrue(session.records().isEmpty())
     }
 

@@ -2,7 +2,9 @@ package com.app.moneymate.capture.spike
 
 /** Pure reducer; all callers serialize on the Android main thread. */
 @Suppress("TooManyFunctions") // One reducer owns every consent/clear transition; splitting state risks divergent copies.
-class SpikeSession(private val clock: () -> Long) {
+class SpikeSession(
+    private val clock: () -> Long,
+) {
     enum class Access { UNKNOWN, NOT_GRANTED, GRANTED }
 
     var access = Access.UNKNOWN
@@ -32,11 +34,17 @@ class SpikeSession(private val clock: () -> Long) {
 
     fun packages(): Set<String> = buffer.map { it.packageName }.toSet()
 
-    fun observe(observer: () -> Unit) { observers.add(observer) }
+    fun observe(observer: () -> Unit) {
+        observers.add(observer)
+    }
 
-    fun unobserve(observer: () -> Unit) { observers.remove(observer) }
+    fun unobserve(observer: () -> Unit) {
+        observers.remove(observer)
+    }
 
-    private fun changed() { observers.toList().forEach { it() } }
+    private fun changed() {
+        observers.toList().forEach { it() }
+    }
 
     fun start() {
         stop()
@@ -114,7 +122,10 @@ class SpikeSession(private val clock: () -> Long) {
     }
 
     /** Lazy factory must not touch notification extras until permitsPayload succeeds. */
-    fun receive(metadata: RawNotification, payload: () -> RawNotification) {
+    fun receive(
+        metadata: RawNotification,
+        payload: () -> RawNotification,
+    ) {
         tick()
         if (!discovery || !connected || access != Access.GRANTED) return
         val token = epoch

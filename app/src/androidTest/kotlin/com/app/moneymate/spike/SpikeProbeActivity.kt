@@ -27,13 +27,15 @@ class SpikeProbeActivity : Activity() {
         manager.createNotificationChannel(NotificationChannel("synthetic", "Synthetic", NotificationManager.IMPORTANCE_DEFAULT))
         listOf(2000L, 6000L, 10_000L).forEachIndexed { index, delay ->
             Handler(Looper.getMainLooper()).postDelayed({
-                val notification = Notification.Builder(this, "synthetic")
-                    .setSmallIcon(android.R.drawable.ic_dialog_info)
-                    .setContentTitle("Synthetic title")
-                    .setContentText(listOf("T01", "SYNTHETIC", "CANARY").joinToString("_"))
-                    .setSubText("Synthetic subtext")
-                    .setStyle(Notification.BigTextStyle().bigText("Synthetic expanded"))
-                    .build()
+                val notification =
+                    Notification
+                        .Builder(this, "synthetic")
+                        .setSmallIcon(android.R.drawable.ic_dialog_info)
+                        .setContentTitle("Synthetic title")
+                        .setContentText(listOf("T01", "SYNTHETIC", "CANARY").joinToString("_"))
+                        .setSubText("Synthetic subtext")
+                        .setStyle(Notification.BigTextStyle().bigText("Synthetic expanded"))
+                        .build()
                 manager.notify(index + 1, notification)
             }, delay)
         }
@@ -43,10 +45,15 @@ class SpikeProbeActivity : Activity() {
         val component = ComponentName("com.app.moneymate", "com.app.moneymate.capture.spike.SpikeNotificationListenerService")
         var bindDenied = false
         var startDenied = false
-        val connection = object : ServiceConnection {
-            override fun onServiceConnected(name: ComponentName, service: IBinder) = Unit
-            override fun onServiceDisconnected(name: ComponentName) = Unit
-        }
+        val connection =
+            object : ServiceConnection {
+                override fun onServiceConnected(
+                    name: ComponentName,
+                    service: IBinder,
+                ) = Unit
+
+                override fun onServiceDisconnected(name: ComponentName) = Unit
+            }
         try {
             val bound = bindService(Intent().setComponent(component), connection, Context.BIND_AUTO_CREATE)
             bindDenied = !bound
@@ -60,8 +67,11 @@ class SpikeProbeActivity : Activity() {
             startDenied = true
         }
         val targetUid = packageManager.getApplicationInfo("com.app.moneymate", 0).uid
-        getSharedPreferences("probe", MODE_PRIVATE).edit()
-            .putBoolean("bindDenied", bindDenied).putBoolean("startDenied", startDenied)
-            .putBoolean("differentUid", targetUid != Process.myUid()).commit()
+        getSharedPreferences("probe", MODE_PRIVATE)
+            .edit()
+            .putBoolean("bindDenied", bindDenied)
+            .putBoolean("startDenied", startDenied)
+            .putBoolean("differentUid", targetUid != Process.myUid())
+            .commit()
     }
 }

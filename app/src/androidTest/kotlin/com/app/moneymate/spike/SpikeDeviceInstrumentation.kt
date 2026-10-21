@@ -48,12 +48,13 @@ class SpikeDeviceInstrumentation : Instrumentation() {
 
     private fun exerciseSnapshot() {
         val metadata = RawNotification("synthetic", 10, 20, false)
-        val extras = Bundle().apply {
-            putCharSequence(Notification.EXTRA_TITLE, "t")
-            putCharSequence(Notification.EXTRA_TEXT, canary())
-            putCharSequence(Notification.EXTRA_BIG_TEXT, "b")
-            putCharSequence(Notification.EXTRA_SUB_TEXT, "s")
-        }
+        val extras =
+            Bundle().apply {
+                putCharSequence(Notification.EXTRA_TITLE, "t")
+                putCharSequence(Notification.EXTRA_TEXT, canary())
+                putCharSequence(Notification.EXTRA_BIG_TEXT, "b")
+                putCharSequence(Notification.EXTRA_SUB_TEXT, "s")
+            }
         val raw = SpikeNotificationSnapshotter.snapshot(metadata, extras)
         checkCase(raw.text == canary() && raw.bigText == "b" && raw.postTime != raw.receivedAt)
         checkCase(!raw.toString().contains(canary()))
@@ -66,7 +67,9 @@ class SpikeDeviceInstrumentation : Instrumentation() {
     }
 
     private fun exerciseListener() {
-        startActivitySync(Intent().setComponent(ComponentName(targetContext, SpikeActivity::class.java)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        startActivitySync(
+            Intent().setComponent(ComponentName(targetContext, SpikeActivity::class.java)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
         waitFor { session.connected }
         click("spike-start")
         launchProbe("post")
@@ -75,11 +78,20 @@ class SpikeDeviceInstrumentation : Instrumentation() {
         click("spike-package-${context.packageName}")
         click("spike-consent")
         waitFor { session.records().any { it.text == canary() } }
+        checkCase(!containsCanary(uiAutomation.rootInActiveWindow))
+        click("spike-reveal-request")
+        click("spike-reveal-confirm")
+        waitFor { containsCanary(uiAutomation.rootInActiveWindow) }
         // Copy uses the metadata-only API through the UI, not a synthetic export hook.
         click("spike-copy")
         onMain {
             val clipboard = targetContext.getSystemService(ClipboardManager::class.java)
-            val text = clipboard.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
+            val text =
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    ?.toString()
+                    .orEmpty()
             checkCase(text.contains("package=") && !text.contains(canary()))
         }
         val listener = "com.app.moneymate/com.app.moneymate.capture.spike.SpikeNotificationListenerService"
@@ -100,7 +112,11 @@ class SpikeDeviceInstrumentation : Instrumentation() {
         launchProbe("probe")
         waitFor {
             val descriptor = uiAutomation.executeShellCommand("run-as ${context.packageName} cat shared_prefs/probe.xml")
-            val result = android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).bufferedReader().use { it.readText() }
+            val result =
+                android.os.ParcelFileDescriptor
+                    .AutoCloseInputStream(descriptor)
+                    .bufferedReader()
+                    .use { it.readText() }
             listOf("differentUid", "bindDenied", "startDenied").all { key ->
                 result.contains("name=\"$key\" value=\"true\"")
             }
@@ -108,8 +124,12 @@ class SpikeDeviceInstrumentation : Instrumentation() {
     }
 
     private fun launchProbe(mode: String) {
-        context.startActivity(Intent().setComponent(ComponentName(context.packageName, SpikeProbeActivity::class.java.name))
-            .putExtra("mode", mode).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(
+            Intent()
+                .setComponent(ComponentName(context.packageName, SpikeProbeActivity::class.java.name))
+                .putExtra("mode", mode)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
         SystemClock.sleep(700)
     }
 
@@ -122,7 +142,10 @@ class SpikeDeviceInstrumentation : Instrumentation() {
         waitForIdleSync()
     }
 
-    private fun find(node: AccessibilityNodeInfo, id: String): AccessibilityNodeInfo? {
+    private fun find(
+        node: AccessibilityNodeInfo,
+        id: String,
+    ): AccessibilityNodeInfo? {
         if (node.contentDescription?.toString() == id) return node
         for (index in 0 until node.childCount) {
             val child = node.getChild(index) ?: continue
@@ -130,6 +153,12 @@ class SpikeDeviceInstrumentation : Instrumentation() {
             if (found != null) return found
         }
         return null
+    }
+
+    private fun containsCanary(node: AccessibilityNodeInfo?): Boolean {
+        if (node == null) return false
+        if (node.text?.toString()?.contains(canary()) == true) return true
+        return (0 until node.childCount).any { containsCanary(node.getChild(it)) }
     }
 
     private fun waitFor(condition: () -> Boolean) {
@@ -143,7 +172,9 @@ class SpikeDeviceInstrumentation : Instrumentation() {
         throw AssertionError("timeout; details omitted")
     }
 
-    private fun onMain(action: () -> Unit) { runOnMainSync(action) }
+    private fun onMain(action: () -> Unit) {
+        runOnMainSync(action)
+    }
 
     private fun checkCase(value: Boolean) {
         if (!value) throw AssertionError("case failed; details omitted")

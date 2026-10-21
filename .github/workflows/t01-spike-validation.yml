@@ -34,19 +34,6 @@ jobs:
       - run: sdkmanager "platforms;android-37.0" "build-tools;37.0.0"
       - name: Check formatting with pinned verified tool
         run: ./gradlew --dependency-verification strict ktlintCheck --console=plain
-      - name: Export verified formatter for offline development
-        if: always()
-        run: |
-          python3 - <<'PYTHON'
-          import hashlib, os, pathlib, shutil, xml.etree.ElementTree as ET
-          root = ET.parse('gradle/verification-metadata.xml').getroot()
-          expected = {element.get('value') for artifact in root.iter() if artifact.tag.endswith('artifact') and artifact.get('name') == 'ktlint-cli-1.8.0-all.jar' for element in artifact if element.tag.endswith('sha256')}
-          jars = list(pathlib.Path(os.environ['GRADLE_USER_HOME']).glob('caches/modules-2/files-2.1/com.pinterest.ktlint/ktlint-cli/1.8.0/*/*all.jar'))
-          assert len(jars) == 1 and hashlib.sha256(jars[0].read_bytes()).hexdigest() in expected
-          dest = pathlib.Path('build/reports/t01/development/ktlint.jar')
-          dest.parent.mkdir(parents=True, exist_ok=True)
-          shutil.copyfile(jars[0], dest)
-          PYTHON
       - name: Build test artifacts with strict verification
         if: always()
         run: |

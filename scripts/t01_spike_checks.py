@@ -110,8 +110,9 @@ def checks():
         verify_manifest(xml, variant == "debug")
         results[variant] = verify_apk(apk, variant == "debug")
         resources = subprocess.check_output([str(analyzer), "files", "list", str(apk)])
+        table = subprocess.check_output([str(sdk / "build-tools/37.0.0/aapt2"), "dump", "resources", str(apk)])
         if variant == "release":
-            assert b"spike" not in resources.lower(), "Spike resource path in release"
+            assert b"spike" not in resources.lower() and b"spike_" not in table.lower(), "Spike resource in release"
     # Unshrunk library classes prove isolation was not merely achieved by R8 removal.
     jars = [p for p in (ROOT / "capture/build/intermediates").rglob("*.jar")
             if "release" in str(p.relative_to(ROOT)).lower() and "classes" in p.name]
@@ -119,6 +120,11 @@ def checks():
     for jar in jars:
         with zipfile.ZipFile(jar) as archive:
             assert not any("/spike/" in n for n in archive.namelist()), "Spike in unshrunk release"
+    app_classes = [p for p in (ROOT / "app/build/intermediates").rglob("*.class")
+                   if "release" in str(p.relative_to(ROOT)).lower()]
+    assert app_classes, "Missing unshrunk app class inventory"
+    assert not any("/spike/" in p.as_posix() for p in app_classes), "Spike in unshrunk app"
+    results["unshrunk_app_classes"] = len(app_classes)
     results["unshrunk_release_jars"] = len(jars)
     report = ROOT / "build/reports/t01/static"
     report.mkdir(parents=True, exist_ok=True)

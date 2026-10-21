@@ -7,17 +7,24 @@ import android.os.Bundle
 object SpikeNotificationSnapshotter {
     private const val MAX_UNITS = 16_384
 
-    fun snapshot(metadata: RawNotification, extras: Bundle?): RawNotification {
+    fun snapshot(
+        metadata: RawNotification,
+        extras: Bundle?,
+    ): RawNotification {
         var remaining = MAX_UNITS
         var truncated = false
+
         fun read(key: String): String? {
-            val value = try {
-                extras?.getCharSequence(key)
-            } catch (_: BadParcelableException) {
-                null
-            } catch (_: ClassCastException) {
-                null
-            }
+            val value =
+                try {
+                    @Suppress("DEPRECATION") // Typed Bundle getters can emit framework type warnings; inspect without logging values.
+                    val candidate = extras?.get(key)
+                    candidate as? CharSequence
+                } catch (_: BadParcelableException) {
+                    null
+                } catch (_: ClassCastException) {
+                    null
+                }
             if (value == null) return null
             var end = minOf(value.length, remaining)
             if (end in 1 until value.length && Character.isHighSurrogate(value[end - 1])) end--
@@ -30,8 +37,15 @@ object SpikeNotificationSnapshotter {
         val bigText = read(Notification.EXTRA_BIG_TEXT)
         val subText = read(Notification.EXTRA_SUB_TEXT)
         return RawNotification(
-            metadata.packageName, metadata.postTime, metadata.receivedAt, metadata.groupSummary,
-            title, text, bigText, subText, truncated,
+            metadata.packageName,
+            metadata.postTime,
+            metadata.receivedAt,
+            metadata.groupSummary,
+            title,
+            text,
+            bigText,
+            subText,
+            truncated,
         )
     }
 }
