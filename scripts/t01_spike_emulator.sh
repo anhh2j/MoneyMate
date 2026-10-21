@@ -122,7 +122,7 @@ if [ "$api" -ge 35 ]; then
   printf 'ImageOS=%s ImageVersion=%s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}" > "$environment"
   platform_field "$environment" host uname -srmo
   platform_field "$environment" adb adb version
-  platform_field "$environment" emulator "$ANDROID_HOME/emulator/emulator" -version
+  platform_field "$environment" emulator-package sed -n -E '/^(Pkg.Revision|Pkg.Path)[[:space:]]*=/p' "$ANDROID_HOME/emulator/source.properties"
   printf 'requested_gpu=%s\n' "${T01_GPU_MODE:-unknown}" >> "$environment"
   platform_field "$environment" avd-gpu-config sed -n -E '/^(hw.gpu.enabled|hw.gpu.mode|hw.ramSize|disk.dataPartition.size)[[:space:]]*=/p' "$ANDROID_AVD_HOME/test.avd/hardware-qemu.ini"
   image_api="$api"
