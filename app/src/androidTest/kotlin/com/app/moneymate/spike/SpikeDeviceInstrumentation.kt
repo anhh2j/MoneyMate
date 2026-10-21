@@ -142,11 +142,8 @@ class SpikeDeviceInstrumentation : Instrumentation() {
     }
 
     private fun openSpike() {
-        targetContext.startActivity(
-            Intent()
-                .setComponent(ComponentName(targetContext, SpikeActivity::class.java))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
-        )
+        val component = "${targetContext.packageName}/${SpikeActivity::class.java.name}"
+        shell("am start -W --activity-clear-top -n $component")
         waitFor { state { session.foreground } }
     }
 
