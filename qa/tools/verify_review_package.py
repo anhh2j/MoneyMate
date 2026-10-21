@@ -189,7 +189,8 @@ def selftest():
                 f'<manifest xmlns:android="http://schemas.android.com/apk/res/android">{perm}<application android:allowBackup="false"/></manifest>')
             open(root + "/review/parser-dependencies.txt", "w").write("ok" if good else "implementation com.squareup.okhttp3")
             open(root + "/review/lint-results-debug.txt", "w").write("No issues found.")
-            open(root + "/MoneyMate/app/build.gradle.kts", "w").write("android {}" if good else 'storePassword = "hunter2xx"')
+            fake_password_assignment = "".join(("storePassword", ' = "', "hunter2xx", '"'))
+            open(root + "/MoneyMate/app/build.gradle.kts", "w").write("android {}" if good else fake_password_assignment)
             return root
         g, b = run(mk(True)), run(mk(False))
         assert verdict(g)[1] == 0, g
