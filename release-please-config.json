@@ -6,10 +6,10 @@
   "bump-minor-pre-major": true,
   "versioning": "prerelease",
   "prerelease": true,
-  "release-as": "0.1.0-alpha.1",
   "packages": {
     ".": {
       "package-name": "MoneyMate",
+      "initial-version": "0.1.0-alpha.1",
       "extra-files": [
         {
           "type": "generic",

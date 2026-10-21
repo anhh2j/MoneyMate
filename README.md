@@ -99,13 +99,9 @@ Dry-run sinh keystore/mật khẩu ngẫu nhiên ngoài repo, build signed R8, k
 
 Build release bình thường thiếu bất kỳ biến signing nào sẽ không ký. Bốn biến: KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD. Keystore thật/mật khẩu do PO quản lý và sao lưu; thêm dưới GitHub secrets khi nghiệm thu, không đưa vào Git. Quy trình decode chỉ tạo file tạm ngoài repo và xóa lúc build kết thúc. Không in secrets ra log.
 
-### GitHub và thứ tự đưa nhánh lên remote
+### GitHub và thẩm quyền
 
-PO bật/cập nhật branch protection main: bắt buộc PR, CI xanh, Leader duyệt, cấm push trực tiếp. Cho phép Actions tạo release PR; kiểm quyền job theo workflow. Chạy CI tại HEAD PR, xác nhận Dependabot được GitHub chấp nhận và kiểm PR title/commit sai bị chặn. Nộp link run/exit code thực tế trong PR; parse YAML/JSON local không thay thế bằng chứng GitHub.
-
-Release-please soạn PR cập nhật version.properties, CHANGELOG và manifest trạng thái. Leader chọn version/release stage, review diff; kiểm bộ ví dụ/unit test, chữ ký, versionCode tăng, source version/tag và Spec. Config release-as hiện chỉ dành bootstrap 0.1.0-alpha.1: Leader gỡ sau bản đầu và quản lý chuyển alpha/beta/rc/stable. Không tự tăng vượt .29. Merge release PR do Leader/PO quyết định sẽ tạo tag/release; cùng workflow build, verify rồi attach APK + SHA-256. Release notes ghi Implements Spec v2.1.0, AC và hạn chế kiểm thiết bị. PO tải APK, kiểm checksum, cài và xác nhận. Dev không chạy phát hành thật trong T00b.
-
-Cấu hình release-please manifest là trạng thái công cụ; Gradle chỉ đọc version.properties. Không dùng version.txt hoặc package.json làm nguồn APK. JSON công cụ/annotation properties cần được giữ khi Leader cập nhật release PR.
+PO/Leader quản lý branch protection, review và quyết định phát hành. Quy trình T00c ở cuối trang và ADR-0004 thay hướng dẫn auto-release cũ; không bật quyền repository hoặc phát hành trong task PR-only.
 
 ### Khóa toàn vẹn dependency — Brief v1.5.0
 
@@ -143,12 +139,23 @@ Bổ sung từ full graph: policy exact-GAV cũng áp dụng cho cấu hình too
 
 Lượt thử B local 20/10/2026 đã chạy quality/build/lint/R8, 20 test JUnit và smoke API trên classloader AGP thực: BC RSA/X509, JWE nén với kiểm ciphertext sai, JDOM XML lành tính. Scan HIGH/CRITICAL và secret của inventory mở rộng đã pass ở lượt bootstrap. Metadata SHA-256 được tái tạo từ rỗng; chỉ có bộ 5 GAV mới. Gói review phải kèm lượt strict, negative controls, APK ký tạm và kết quả HEAD cuối. Đây chưa phải nghiệm thu: CI GitHub, emulator và tương thích vendor vẫn cần kiểm/duyệt.
 
-### Bootstrap release PR đầu tiên
+### T00c — bootstrap, candidate và publication
 
-Release-please dùng tiêu đề `chore(release): release ${version}` để commit và PR sinh ra tuân thủ scope hiện hành. Config release-as chọn version bootstrap, nhưng lịch sử chỉ có ci vẫn bị bỏ qua nếu không có release note. Khi PO/Leader sẵn sàng khởi phát release PR đầu tiên từ squash merge T00b, thêm footer sau vào **commit message squash merge**, không chỉ vào mô tả PR:
+T00c thay hướng dẫn bootstrap/push-to-main cũ của ADR-0002 bằng [ADR-0004](docs/adr/0004-release-bootstrap-publication-safety.md). Merge PR kỹ thuật hoặc push main không tạo candidate/tag/release. Nhánh release cũ giữ nguyên làm bằng chứng.
 
-```text
-Release-As: 0.1.0-alpha.1
+`version.properties` vẫn là nguồn APK duy nhất: 0.1.0-alpha.1 / 10001. Manifest bootstrap rỗng mô tả chưa có release; initial-version chỉ áp dụng bản đầu. Không còn release-as ghim version. Candidate chuẩn hóa một mục release, giữ Unreleased và toàn bộ nội dung M0.
+
+Kiểm offline, không dùng signing secrets hay API ghi:
+```sh
+npm ci --ignore-scripts --no-audit --no-fund
+node --test scripts/tests/release_plan.test.cjs
+python3 -m unittest discover -s scripts/tests -p 'test_release_*.py' -v
 ```
 
-Footer yêu cầu tạo release PR cho version đã duyệt; chưa tạo tag/phát hành. Leader/PO vẫn kiểm secrets, review và merge release PR riêng. Trong release PR đầu tiên, bỏ mục "Pending release" chuẩn bị sẵn khi mục phát hành thực đã được tạo; verifier hỗ trợ cả heading version thường và heading có link do release-please sinh. Nếu chưa sẵn sàng, không thêm footer; pipeline chờ commit feat/fix có nội dung phát hành. Sau bản đầu, Leader gỡ release-as bootstrap và quản lý stage theo DOC-VER. Dev không tự merge hoặc chạy phát hành thật.
+Release candidate workflow chỉ workflow_dispatch: PO nhập full main SHA, version dự kiến và xác nhận `CANDIDATE <version> @ <sha>`. Plan mặc định chỉ đọc. create-pr cần biến CANDIDATE_CREATION_ENABLED=true, môi trường moneymate-candidate có PO reviewer, protected-branches-only và label autorelease: pending đã tồn tại. Nó tạo một nhánh mới release-candidates/... và PR Draft; không chạm nhánh release-please cũ, không approve/merge/tag/release. Quyền tạo PR bằng GITHUB_TOKEN do PO quyết định ở task cấu hình riêng, không tự bật.
+
+Release publication là workflow_dispatch riêng. PUBLICATION_ENABLED mặc định chưa bật. PO phải nhập SHA main của PR release đã merge, version, số PR, fingerprint SHA-256 chứng thư ký đã kiểm độc lập và `PUBLISH <version> @ <sha>`. Preflight chỉ đọc kiểm environment moneymate-publication có PO reviewer/protected branches, main SHA không đổi, CI hậu merge mới nhất đạt và PR chỉ đổi ba file release được phép. Signing job qua environment approval mới nhận bốn signing secrets; publisher không nhận signing secrets. Nó kiểm lại APK/version/signature/checksum/signer rồi tạo annotated tag, draft release, tải APK/checksum, kiểm assets trước khi công bố. Thất bại sau tạo tag phải báo PO/Leader điều tra, không rerun/ghi đè tag.
+
+Không chạy các workflow này trong task PR-only. Thiết lập environment/reviewer, biến enablement, label, repository PR permission và secrets thuộc PO sau khi Leader duyệt; thiếu điều kiện thì BLOCKED. Nếu environment yêu cầu prevent-self-review trong mô hình chỉ một PO, phải giải quyết mô hình người vận hành bằng quyết định riêng; không bỏ approval để chạy qua.
+
+CI của PR do GITHUB_TOKEN tạo có thể chờ người có quyền chọn Approve workflows to run theo tài liệu GitHub hiện hành. Sau đó vẫn cần QA/Leader review và required checks đúng HEAD; không dùng bot tự approve/merge hoặc pull_request_target để né cổng. Luồng publication thực, signing secrets thật và thiết bị thật chưa được nghiệm thu bởi regression offline.
