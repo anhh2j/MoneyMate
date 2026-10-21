@@ -80,6 +80,7 @@ class SpikeDeviceInstrumentation : Instrumentation() {
                 .setComponent(ComponentName(targetContext, SpikeActivity::class.java))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
+        click("spike-rebind")
         waitFor { state { session.connected } }
         click("spike-start")
         launchProbe("post")

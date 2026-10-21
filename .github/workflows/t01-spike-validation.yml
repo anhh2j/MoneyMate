@@ -91,7 +91,8 @@ jobs:
         with:
           api-level: ${{ matrix.api == 37 && '37.0' || matrix.api }}
           arch: x86_64
-          target: default
+          target: ${{ matrix.api == 37 && 'google_apis' || 'default' }}
+          ram-size: 2048M
           disable-animations: true
           script: EXPECTED_T01_API=${{ matrix.api }} bash scripts/t01_spike_emulator.sh
       - uses: actions/upload-artifact@v7

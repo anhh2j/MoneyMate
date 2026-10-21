@@ -4,6 +4,8 @@ api="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
 test "$api" -eq "${EXPECTED_T01_API:-$api}"
 report="build/reports/t01/api-$api"
 mkdir -p "$report"
+adb shell getprop ro.config.low_ram > "$report/low-ram-property.txt"
+adb shell getprop ro.build.fingerprint > "$report/fingerprint.txt"
 listener='com.app.moneymate/com.app.moneymate.capture.spike.SpikeNotificationListenerService'
 cleanup() {
   if [ "$api" -eq 26 ]; then
@@ -37,7 +39,7 @@ on_exit() {
 }
 trap on_exit EXIT
 instrument_status=0
-adb shell am instrument -w com.app.moneymate.test/com.app.moneymate.spike.SpikeDeviceInstrumentation > "$private_dir/instrumentation.txt" || instrument_status=$?
+adb shell am instrument -w -r com.app.moneymate.test/com.app.moneymate.spike.SpikeDeviceInstrumentation > "$private_dir/instrumentation.txt" || instrument_status=$?
 python3 scripts/t01_spike_checks.py --scan "$private_dir/instrumentation.txt"
 cp "$private_dir/instrumentation.txt" "$report/instrumentation.txt"
 test "$instrument_status" -eq 0
@@ -51,7 +53,7 @@ python3 scripts/t01_spike_checks.py --scan "$private_dir/logcat.txt"
 adb exec-out run-as com.app.moneymate tar -cf - . > "$private_dir/storage.tar"
 python3 scripts/t01_spike_checks.py --scan "$private_dir/storage.tar"
 adb shell am force-stop com.app.moneymate
-adb shell am instrument -w -e phase cold com.app.moneymate.test/com.app.moneymate.spike.SpikeDeviceInstrumentation > "$private_dir/cold.txt"
+adb shell am instrument -w -r -e phase cold com.app.moneymate.test/com.app.moneymate.spike.SpikeDeviceInstrumentation > "$private_dir/cold.txt"
 python3 scripts/t01_spike_checks.py --scan "$private_dir/cold.txt"
 grep -q 'Cold process state PASS' "$private_dir/cold.txt"
 grep -q 'INSTRUMENTATION_CODE: -1' "$private_dir/cold.txt"
