@@ -98,7 +98,7 @@ jobs:
           ./gradlew --dependency-verification strict :app:assembleRelease --console=plain
       - name: Verify signed APK and checksum, no publication
         run: python3 scripts/release_control.py verify-apk --sha "$SOURCE_SHA" --version "$RELEASE_VERSION" --pr "$RELEASE_PR" --signer "$SIGNER_SHA256" --apk app/build/outputs/apk/release/app-release.apk
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: approved-signed-apk
           path: app/build/outputs/apk/release/app-release.apk*
