@@ -97,6 +97,15 @@ def scan_canary(data):
     assert canary not in data, "Sensitive canary detected (content suppressed)"
 
 
+def verify_probe_bytecode(paths):
+    assert paths, "Missing isolated UID probe bytecode"
+    forbidden = (b"kotlin/jvm/internal/Intrinsics", b"kotlin/collections/", b"kotlin/jvm/functions/")
+    for path in paths:
+        data = path.read_bytes()
+        assert data.startswith(bytes.fromhex("cafebabe")), "Invalid JVM class inventory"
+        assert not any(marker in data for marker in forbidden), "Probe depends on target-only Kotlin runtime"
+
+
 def checks():
     sdk = pathlib.Path(os.environ["ANDROID_HOME"])
     analyzer = sdk / "cmdline-tools/latest/bin/apkanalyzer"
@@ -124,6 +133,9 @@ def checks():
                    if "release" in str(p.relative_to(ROOT)).lower()]
     assert app_classes, "Missing unshrunk app class inventory"
     assert not any("/spike/" in p.as_posix() for p in app_classes), "Spike in unshrunk app"
+    probes = list((ROOT / "app/build/intermediates").rglob("SpikeProbeActivity*.class"))
+    verify_probe_bytecode(probes)
+    results["isolated_probe_classes"] = len(probes)
     results["unshrunk_app_classes"] = len(app_classes)
     results["unshrunk_release_jars"] = len(jars)
     report = ROOT / "build/reports/t01/static"

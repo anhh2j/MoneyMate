@@ -81,6 +81,16 @@ class SpikeChecksTest(unittest.TestCase):
         with self.assertRaises(AssertionError):
             CHECKS.verify_manifest(manifest.replace('<application />', '<uses-permission android:name="android.permission.INTERNET"/><application/>'), False)
 
+    def test_probe_rejects_target_only_runtime(self):
+        path = self.root / "Probe.class"
+        path.write_bytes(bytes.fromhex("cafebabe") + b"framework-only")
+        CHECKS.verify_probe_bytecode([path])
+        path.write_bytes(bytes.fromhex("cafebabe") + b"kotlin/jvm/internal/Intrinsics")
+        with self.assertRaises(AssertionError):
+            CHECKS.verify_probe_bytecode([path])
+        with self.assertRaises(AssertionError):
+            CHECKS.verify_probe_bytecode([])
+
     def test_canary_redaction(self):
         CHECKS.scan_canary(b"metadata only")
         with self.assertRaisesRegex(AssertionError, "content suppressed"):

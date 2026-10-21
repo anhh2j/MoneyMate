@@ -18,8 +18,12 @@ import android.os.Process
 class SpikeProbeActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if ("probe".equals(intent.getStringExtra("mode"))) probe() else publish()
-        finish()
+        if ("probe".equals(intent.getStringExtra("mode"))) {
+            probe()
+            finish()
+        } else {
+            publish()
+        }
     }
 
     private fun publish() {
@@ -30,7 +34,7 @@ class SpikeProbeActivity : Activity() {
         var index = 0
         while (index < 3) {
             val id = index + 1
-            val delay = 2000L + index * 4000L
+            val delay = 2000L + index * 2000L
             Handler(Looper.getMainLooper()).postDelayed(
                 object : Runnable {
                     override fun run() {
@@ -41,7 +45,9 @@ class SpikeProbeActivity : Activity() {
                                 .append("SYNTHETIC")
                                 .append('_')
                                 .append("CANARY")
-                        val notification =
+                        // Passing the Java result directly avoids a Kotlin Intrinsics null-check.
+                        manager.notify(
+                            id,
                             Notification
                                 .Builder(this@SpikeProbeActivity, "synthetic")
                                 .setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -49,8 +55,9 @@ class SpikeProbeActivity : Activity() {
                                 .setContentText(content)
                                 .setSubText("Synthetic subtext")
                                 .setStyle(Notification.BigTextStyle().bigText("Synthetic expanded"))
-                                .build()
-                        manager.notify(id, notification)
+                                .build(),
+                        )
+                        if (id == 1) this@SpikeProbeActivity.finish()
                     }
                 },
                 delay,
@@ -70,8 +77,8 @@ class SpikeProbeActivity : Activity() {
         val connection =
             object : ServiceConnection {
                 override fun onServiceConnected(
-                    name: ComponentName,
-                    service: IBinder,
+                    name: ComponentName?,
+                    service: IBinder?,
                 ) = Unit
 
                 override fun onServiceDisconnected(name: ComponentName?) = Unit

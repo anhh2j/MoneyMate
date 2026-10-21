@@ -7,6 +7,7 @@ import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import com.app.moneymate.capture.spike.SpikeNotificationAccess
 import com.app.moneymate.capture.spike.SpikeNotificationListenerService
@@ -15,6 +16,15 @@ class SpikeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    SpikeNotificationListenerService.session.stop()
+                    finish()
+                }
+            },
+        )
         // Ignore all incoming extras/URI. No external intent can start a session or consent.
         setContent { SpikeScreen(this, ::openSettings, ::rebind) }
     }
@@ -28,11 +38,6 @@ class SpikeActivity : ComponentActivity() {
     override fun onPause() {
         SpikeNotificationListenerService.session.setForeground(false)
         super.onPause()
-    }
-
-    override fun onDestroy() {
-        if (isFinishing) SpikeNotificationListenerService.session.stop()
-        super.onDestroy()
     }
 
     private fun openSettings(): Boolean =

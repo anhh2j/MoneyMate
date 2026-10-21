@@ -29,7 +29,7 @@ class SpikeDeviceInstrumentation : Instrumentation() {
         val result = Bundle()
         try {
             if (phase == "cold") {
-                checkCase(!session.discovery && !session.payloadEnabled && session.records().isEmpty())
+                checkCase(state { !session.discovery && !session.payloadEnabled && session.records().isEmpty() })
                 result.putString("stream", "Cold process state PASS\n")
             } else {
                 exerciseSnapshot()
@@ -80,14 +80,14 @@ class SpikeDeviceInstrumentation : Instrumentation() {
                 .setComponent(ComponentName(targetContext, SpikeActivity::class.java))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
-        waitFor { session.connected }
+        waitFor { state { session.connected } }
         click("spike-start")
         launchProbe("post")
-        waitFor { session.records().any { it.packageName == context.packageName } }
+        waitFor { state { session.records().any { it.packageName == context.packageName } } }
         onMain { checkCase(session.records().all { it.text == null }) }
         click("spike-package-${context.packageName}")
         click("spike-consent")
-        waitFor { session.records().any { it.text == canary() } }
+        waitFor { state { session.records().any { it.text == canary() } } }
         checkCase(!containsCanary(uiAutomation.rootInActiveWindow))
         click("spike-reveal-request")
         click("spike-reveal-confirm")
@@ -110,9 +110,9 @@ class SpikeDeviceInstrumentation : Instrumentation() {
             checkCase(text.contains("package=") && !text.contains(canary()))
         }
         changeAccess(false)
-        waitFor { session.access != SpikeSession.Access.GRANTED && session.records().isEmpty() }
+        waitFor { state { session.access != SpikeSession.Access.GRANTED && session.records().isEmpty() } }
         changeAccess(true)
-        waitFor { session.connected }
+        waitFor { state { session.connected } }
         onMain { checkCase(!session.payloadEnabled) }
         click("spike-start")
         click("spike-clear")
@@ -209,12 +209,16 @@ class SpikeDeviceInstrumentation : Instrumentation() {
     private fun waitFor(condition: () -> Boolean) {
         val until = SystemClock.elapsedRealtime() + 20_000
         while (SystemClock.elapsedRealtime() < until) {
-            var success = false
-            onMain { success = condition() }
-            if (success) return
+            if (condition()) return
             SystemClock.sleep(150)
         }
         throw AssertionError("timeout; details omitted")
+    }
+
+    private fun state(condition: () -> Boolean): Boolean {
+        var result = false
+        runOnMainSync { result = condition() }
+        return result
     }
 
     private fun onMain(action: () -> Unit) {
