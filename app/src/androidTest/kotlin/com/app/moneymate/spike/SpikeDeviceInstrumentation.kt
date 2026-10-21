@@ -92,16 +92,12 @@ class SpikeDeviceInstrumentation : Instrumentation() {
     }
 
     private fun exerciseListener() {
-        startActivitySync(
-            Intent()
-                .setComponent(ComponentName(targetContext, SpikeActivity::class.java))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
+        openSpike()
         checkCase(state { session.access == SpikeSession.Access.NOT_GRANTED })
         click("spike-settings")
         changeAccess(true)
-        shell("input keyevent 4")
-        waitFor { state { session.access == SpikeSession.Access.GRANTED } }
+        openSpike()
+        waitFor { state { session.foreground && session.access == SpikeSession.Access.GRANTED } }
         click("spike-rebind")
         waitFor { state { session.connected } }
         click("spike-start")
@@ -143,6 +139,15 @@ class SpikeDeviceInstrumentation : Instrumentation() {
         uiAutomation.executeShellCommand("input keyevent 3").close()
         SystemClock.sleep(500)
         onMain { checkCase(!session.foreground && session.records().all { it.text == null }) }
+    }
+
+    private fun openSpike() {
+        targetContext.startActivity(
+            Intent()
+                .setComponent(ComponentName(targetContext, SpikeActivity::class.java))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
+        )
+        waitFor { state { session.foreground } }
     }
 
     private fun changeAccess(granted: Boolean) {
