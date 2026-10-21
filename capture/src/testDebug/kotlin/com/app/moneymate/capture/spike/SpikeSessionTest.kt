@@ -6,6 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@Suppress("MagicNumber") // Deterministic fake-clock and buffer boundary test inputs only.
 class SpikeSessionTest {
     private var now = 0L
     private val session = SpikeSession { now }
@@ -51,7 +52,7 @@ class SpikeSessionTest {
         session.consent(setOf("test.publisher"))
         repeat(101) { send() }
         assertEquals(100, session.records().size)
-        assertEquals(2, session.dropped)
+        assertEquals(2L, session.dropped)
         now = SpikeSession.PAYLOAD_TTL
         session.tick()
         assertTrue(session.records().all { it.text == null })

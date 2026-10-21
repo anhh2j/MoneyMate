@@ -27,7 +27,6 @@ class SpikeNotificationListenerService : NotificationListenerService() {
     }
 
     override fun onListenerDisconnected() {
-        handler.removeCallbacks(tick)
         session.setConnection(false)
         session.setAccess(SpikeNotificationAccess.read(this))
     }
@@ -45,6 +44,7 @@ class SpikeNotificationListenerService : NotificationListenerService() {
     override fun onDestroy() {
         handler.removeCallbacks(tick)
         session.setConnection(false)
+        session.stop()
         super.onDestroy()
     }
 

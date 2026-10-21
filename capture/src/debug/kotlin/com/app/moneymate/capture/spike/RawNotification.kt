@@ -1,6 +1,7 @@
 package com.app.moneymate.capture.spike
 
 /** Debug RAM only. No generated toString/copy/component methods for payload. */
+@Suppress("LongParameterList") // Exact debug snapshot contract; do not wrap/retain the original Bundle.
 class RawNotification(
     val packageName: String,
     val postTime: Long,

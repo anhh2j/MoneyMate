@@ -16,18 +16,26 @@ import com.app.moneymate.capture.spike.SpikeSession
 
 /** No raw values in assertion messages, instrumentation status, or evidence. */
 class SpikeDeviceInstrumentation : Instrumentation() {
+    private var phase: String? = null
+
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
+        phase = arguments?.getString("phase")
         start()
     }
 
     override fun onStart() {
         val result = Bundle()
         try {
-            exerciseSnapshot()
-            exerciseListener()
-            exerciseIsolation()
-            result.putString("stream", "ING-01..05 runtime assertions PASS\n")
+            if (phase == "cold") {
+                checkCase(!session.discovery && !session.payloadEnabled && session.records().isEmpty())
+                result.putString("stream", "Cold process state PASS\n")
+            } else {
+                exerciseSnapshot()
+                exerciseListener()
+                exerciseIsolation()
+                result.putString("stream", "ING-01..05 runtime assertions PASS\n")
+            }
             finish(Activity.RESULT_OK, result)
         } catch (_: AssertionError) {
             result.putString("stream", "FAIL: runtime assertion; payload omitted\n")
@@ -74,6 +82,13 @@ class SpikeDeviceInstrumentation : Instrumentation() {
             val text = clipboard.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
             checkCase(text.contains("package=") && !text.contains(canary()))
         }
+        val listener = "com.app.moneymate/com.app.moneymate.capture.spike.SpikeNotificationListenerService"
+        uiAutomation.executeShellCommand("cmd notification disallow_listener $listener").close()
+        waitFor { session.access != SpikeSession.Access.GRANTED && session.records().isEmpty() }
+        uiAutomation.executeShellCommand("cmd notification allow_listener $listener").close()
+        waitFor { session.connected }
+        onMain { checkCase(!session.payloadEnabled) }
+        click("spike-start")
         click("spike-clear")
         onMain { checkCase(session.records().isEmpty() && !session.payloadEnabled) }
         uiAutomation.executeShellCommand("input keyevent 3").close()

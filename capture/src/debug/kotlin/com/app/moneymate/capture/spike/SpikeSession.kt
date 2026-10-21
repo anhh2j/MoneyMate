@@ -1,6 +1,7 @@
 package com.app.moneymate.capture.spike
 
 /** Pure reducer; all callers serialize on the Android main thread. */
+@Suppress("TooManyFunctions") // One reducer owns every consent/clear transition; splitting state risks divergent copies.
 class SpikeSession(private val clock: () -> Long) {
     enum class Access { UNKNOWN, NOT_GRANTED, GRANTED }
 

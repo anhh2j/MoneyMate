@@ -27,6 +27,7 @@ private fun Control(label: String, id: String, action: () -> Unit) {
     BasicText(label, Modifier.padding(12.dp).semantics { contentDescription = id }.clickable(onClick = action))
 }
 
+@Suppress("LongMethod") // Single debug screen; raw never enters saved/secondary state.
 @Composable
 fun SpikeScreen(context: Context, settings: () -> Boolean, rebind: () -> Unit) {
     val session = SpikeNotificationListenerService.session
@@ -54,7 +55,14 @@ fun SpikeScreen(context: Context, settings: () -> Boolean, rebind: () -> Unit) {
         if (settingsMissing) BasicText(stringResource(R.string.spike_settings_missing))
         Control(stringResource(R.string.spike_rebind), "spike-rebind", rebind)
         session.packages().forEach { pkg ->
-            Control("Package: $pkg", "spike-package-$pkg") { chosen = pkg; consent = true }
+            Control("Package: $pkg", "spike-package-$pkg") {
+                if (session.payloadEnabled) {
+                    session.consent(emptySet())
+                } else {
+                    chosen = pkg
+                    consent = true
+                }
+            }
         }
         if (consent && chosen != null) {
             BasicText(stringResource(R.string.spike_consent))

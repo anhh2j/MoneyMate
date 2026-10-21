@@ -20,13 +20,13 @@ grep -q 'ING-01..05 runtime assertions PASS' "$private_dir/instrumentation.txt"
 grep -q 'INSTRUMENTATION_CODE: -1' "$private_dir/instrumentation.txt"
 adb logcat -d > "$private_dir/logcat.txt"
 python3 scripts/t01_spike_checks.py --scan "$private_dir/logcat.txt"
-adb exec-out run-as com.app.moneymate tar -cf - files shared_prefs cache databases > "$private_dir/storage.tar" 2>/dev/null || true
-# run-as tar reports absent directories on an empty app; do not equate failed inspection with pass.
-adb shell run-as com.app.moneymate ls > "$private_dir/storage-list.txt"
+adb exec-out run-as com.app.moneymate tar -cf - . > "$private_dir/storage.tar"
 python3 scripts/t01_spike_checks.py --scan "$private_dir/storage.tar"
 adb shell am force-stop com.app.moneymate
-adb shell am start -W -n com.app.moneymate/com.app.moneymate.spike.SpikeActivity >/dev/null
-adb shell input keyevent 3
+adb shell am instrument -w -e phase cold com.app.moneymate.test/com.app.moneymate.spike.SpikeDeviceInstrumentation > "$private_dir/cold.txt"
+python3 scripts/t01_spike_checks.py --scan "$private_dir/cold.txt"
+grep -q 'Cold process state PASS' "$private_dir/cold.txt"
+grep -q 'INSTRUMENTATION_CODE: -1' "$private_dir/cold.txt"
 python3 - "$api" "$report" <<'PY'
 import hashlib, json, pathlib, subprocess, sys
 api, report = sys.argv[1], pathlib.Path(sys.argv[2])
@@ -34,7 +34,7 @@ apks = sorted(pathlib.Path('app/build/outputs/apk').rglob('*.apk'))
 result = {'api': int(api), 'fingerprint': subprocess.check_output(['adb','shell','getprop','ro.build.fingerprint'], text=True).strip(),
           'runtime': 'PASS', 'automated_shell_grant': True, 'real_bank_device': 'NOT VERIFIED',
           'apk_sha256': {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in apks},
-          'limitations': ['User Settings grant and OEM restrictions require manual evidence', 'Force-stop executed; cold-state UI assertion pending', 'API37 is verified only by an API37 job']}
+          'limitations': ['User Settings grant and OEM restrictions require manual evidence', 'API37 is verified only by an API37 job']}
 (report / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
 print('PASS: synthetic system callback and external UID isolation; manual/device limits recorded')
 PY
