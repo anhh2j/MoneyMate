@@ -17,6 +17,7 @@ import com.app.moneymate.capture.spike.SpikeSession
 /** No raw values in assertion messages, instrumentation status, or evidence. */
 class SpikeDeviceInstrumentation : Instrumentation() {
     private var phase: String? = null
+    private var stage = "snapshot"
 
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
@@ -33,18 +34,20 @@ class SpikeDeviceInstrumentation : Instrumentation() {
             } else {
                 exerciseSnapshot()
                 sendStatus(0, Bundle().apply { putString("case", "ING-01 snapshot null/malformed/limit PASS") })
+                stage = "listener"
                 exerciseListener()
                 sendStatus(0, Bundle().apply { putString("case", "ING-02..05 listener/privacy PASS") })
+                stage = "external-uid"
                 exerciseIsolation()
                 sendStatus(0, Bundle().apply { putString("case", "ING-03 external UID bind/start denied PASS") })
                 result.putString("stream", "ING-01..05 runtime assertions PASS\n")
             }
             finish(Activity.RESULT_OK, result)
         } catch (_: AssertionError) {
-            result.putString("stream", "FAIL: runtime assertion; payload omitted\n")
+            result.putString("stream", "FAIL: $stage assertion; payload omitted\n")
             finish(Activity.RESULT_CANCELED, result)
         } catch (_: RuntimeException) {
-            result.putString("stream", "FAIL: runtime exception; details omitted\n")
+            result.putString("stream", "FAIL: $stage exception; details omitted\n")
             finish(Activity.RESULT_CANCELED, result)
         }
     }
@@ -67,6 +70,8 @@ class SpikeDeviceInstrumentation : Instrumentation() {
         checkCase(limited.truncated && limited.textBytes() <= 32 * 1024)
         extras.putInt(Notification.EXTRA_TEXT, 1)
         checkCase(SpikeNotificationSnapshotter.snapshot(metadata, extras).text == null)
+        extras.putCharSequence(Notification.EXTRA_TEXT, android.text.SpannableString("spanned"))
+        checkCase(SpikeNotificationSnapshotter.snapshot(metadata, extras).text == "spanned")
     }
 
     private fun exerciseListener() {
@@ -145,6 +150,7 @@ class SpikeDeviceInstrumentation : Instrumentation() {
     }
 
     private fun click(id: String) {
+        stage = id
         waitFor {
             val root = uiAutomation.rootInActiveWindow ?: return@waitFor false
             val node = find(root, id)
