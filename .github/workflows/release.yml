@@ -36,7 +36,7 @@ jobs:
       RELEASE_VERSION: ${{ inputs.version }}
       RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha }}
           fetch-depth: 0
@@ -71,7 +71,7 @@ jobs:
       RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
       CANDIDATE_CREATION_ENABLED: ${{ vars.CANDIDATE_CREATION_ENABLED }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.source_sha }}
           fetch-depth: 0
