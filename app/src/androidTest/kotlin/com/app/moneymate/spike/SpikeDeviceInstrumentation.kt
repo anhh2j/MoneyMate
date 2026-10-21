@@ -73,6 +73,9 @@ class SpikeDeviceInstrumentation : Instrumentation() {
             }
         val raw = SpikeNotificationSnapshotter.snapshot(metadata, extras)
         checkCase(raw.text == canary() && raw.bigText == "b" && raw.postTime != raw.receivedAt)
+        checkCase(raw.title == "t" && raw.subText == "s")
+        val missing = SpikeNotificationSnapshotter.snapshot(metadata, Bundle())
+        checkCase(listOf(missing.title, missing.text, missing.bigText, missing.subText).all { it == null })
         checkCase(!raw.toString().contains(canary()))
         checkCase(SpikeNotificationSnapshotter.snapshot(metadata, null).text == null)
         extras.putCharSequence(Notification.EXTRA_TEXT, "x".repeat(20_000))
@@ -82,6 +85,10 @@ class SpikeDeviceInstrumentation : Instrumentation() {
         checkCase(SpikeNotificationSnapshotter.snapshot(metadata, extras).text == null)
         extras.putCharSequence(Notification.EXTRA_TEXT, android.text.SpannableString("spanned"))
         checkCase(SpikeNotificationSnapshotter.snapshot(metadata, extras).text == "spanned")
+        val prefix = "x".repeat(16_382)
+        extras.putCharSequence(Notification.EXTRA_TEXT, prefix + "\uD83D\uDE42")
+        val unicode = SpikeNotificationSnapshotter.snapshot(metadata, extras)
+        checkCase(unicode.truncated && unicode.text == prefix && unicode.textBytes() <= 32 * 1024)
     }
 
     private fun exerciseListener() {
