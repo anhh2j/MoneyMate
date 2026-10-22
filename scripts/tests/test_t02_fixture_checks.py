@@ -74,7 +74,7 @@ class FixtureChecksTest(unittest.TestCase):
         for case, old in zip(manifest['cases'], prior['cases']):
             self.assertEqual(old['id'], case['id'])
             for key in case:
-                if key != 'inputSha256':
+                if key not in ('inputSha256', 'approval'):
                     self.assertEqual(old[key], case[key])
             for field in ('inputPath', 'expectedPath'):
                 if field == 'expectedPath' or case['id'] not in edited:
@@ -83,6 +83,33 @@ class FixtureChecksTest(unittest.TestCase):
         for bank in ('bidv', 'mb'):
             _, title, _, _ = t02.parse_text(t02.ROOT / 'fixtures' / bank / 'noise_promotion_01.txt')
             self.assertTrue(title.startswith('🎁 '))
+
+    def test_po_privacy_recording_preserves_source_and_qa_gate(self):
+        import subprocess
+        source = '547bc6c05d3655fd8d02635e038d9f0292b75118'
+        reference = 'REVIEW_PO_T02_PRIVACY_SIGNOFF_A'
+        manifest = t02.strict_json(t02.ROOT / 'fixtures/manifest.json')
+        prior = json.loads(subprocess.check_output(['git', 'show', source + ':fixtures/manifest.json'], cwd=t02.ROOT))
+        evidence = (t02.ROOT / 'docs/fixtures/T02-evidence.md').read_text()
+        self.assertIn('## ' + reference, evidence)
+        self.assertIn('https://github.com/anhh2j/MoneyMate/issues/14#issuecomment-6336501800', evidence)
+        self.assertIn(source, evidence)
+        expected = copy.deepcopy(prior)
+        for case in expected['cases']:
+            self.assertEqual({'poPrivacy': 'PENDING', 'qaPrivacy': 'PENDING', 'evidenceRef': None}, case['approval'])
+            case['approval'] = {'poPrivacy': 'APPROVED', 'qaPrivacy': 'PENDING', 'evidenceRef': reference}
+            self.assertFalse(t02.approval_check(case['approval'], case['id']))
+            source_hashes = []
+            for field in ('inputPath', 'expectedPath'):
+                raw = subprocess.check_output(['git', 'show', source + ':fixtures/' + case[field]], cwd=t02.ROOT)
+                self.assertEqual(raw, (t02.ROOT / 'fixtures' / case[field]).read_bytes())
+                source_hashes.append(hashlib.sha256(raw).hexdigest())
+            self.assertIn('| `' + case['id'] + '` | `' + source_hashes[0] + '` | `' + source_hashes[1] + '` |', evidence)
+        self.assertEqual(expected, manifest)
+        self.assertFalse(t02.validate()['acceptedCorpus'])
+        with self.assertRaises(t02.Invalid) as raised:
+            t02.validate(require_approved=True)
+        self.assertEqual('PROVENANCE', raised.exception.rule)
 
     def test_content_oracle_mutations_after_matching_hashes(self):
         def expected_mutation(index, field, value):
@@ -166,7 +193,7 @@ class FixtureChecksTest(unittest.TestCase):
     def test_nc10_provenance(self):
         self.control('NC-10', 'wrong-corpus', 'PROVENANCE', lambda r, m, s: m.update(corpusClass='OBSERVED'))
         self.control('NC-10', 'synthetic-golden', 'PROVENANCE', lambda r, m, s: m['cases'][0].update(eligibleForRealBankGolden=True))
-        self.control('NC-10', 'approval-no-evidence', 'PROVENANCE', lambda r, m, s: m['cases'][0]['approval'].update(poPrivacy='APPROVED'))
+        self.control('NC-10', 'approval-no-evidence', 'PROVENANCE', lambda r, m, s: m['cases'][0]['approval'].update(poPrivacy='APPROVED', evidenceRef=None))
         for index in (5, 10, 3):
             self.control('NC-10', 'unobserved-source-' + str(index), 'PROVENANCE', lambda r, m, s, i=index: m['cases'][i]['provenance'].update(kind='synthetic_from_observed_structure', sourceRef='PO_BIDV_STRUCTURE'))
 
