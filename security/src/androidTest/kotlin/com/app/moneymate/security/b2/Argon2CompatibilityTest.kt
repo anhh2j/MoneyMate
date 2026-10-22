@@ -66,7 +66,9 @@ class Argon2CompatibilityTest {
         assertThrows(Argon2Exception::class.java) { derive(256, salt = "short") }
         assertThrows(IllegalArgumentException::class.java) { derive(0) }
         assertThrows(IllegalArgumentException::class.java) { derive(256, iterations = 0) }
-        assertThrows(Argon2Exception::class.java) { Argon2Kt().verify(mode, "SYNTHETIC_INVALID_ENCODING", "password".toByteArray()) }
+        assertThrows(Argon2Exception::class.java) {
+            Argon2Kt().verify(mode, "SYNTHETIC_INVALID_ENCODING", "password".toByteArray())
+        }
         metric(JSONObject().put("case", "MALFORMED_REJECTED").put("result", "PASS"))
     }
 
