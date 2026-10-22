@@ -50,18 +50,30 @@ class FixtureChecksTest(unittest.TestCase):
         self.assertEqual(before, hashes(t02.ROOT / 'fixtures'))
         ROWS.append(dict(control=control, subcase=subcase, result='PASS', expected=rule, observed=raised.exception.rule, originalUnchanged=True))
 
-    def test_clean_deterministic_pending_and_c09(self):
+    def test_clean_deterministic_approved_and_c09(self):
         first = t02.validate()
         self.assertEqual(first, t02.validate())
-        self.assertFalse(first['acceptedCorpus'])
-        self.assertEqual(15, len(first['pendingApprovals']))
+        self.assertTrue(first['acceptedCorpus'])
+        self.assertEqual([], first['pendingApprovals'])
         self.assertEqual(3, len(first['unresolvedOracles']))
         self.assertEqual(72, first['scenarioCount'])
         self.assertEqual('PASS', t02.qa_c09(t02.ROOT)['result'])
         with tempfile.TemporaryDirectory() as empty:
             self.assertEqual('NA', t02.qa_c09(pathlib.Path(empty))['result'])
-        with self.assertRaises(t02.Invalid):
-            t02.validate(require_approved=True)
+        self.assertEqual(first, t02.validate(require_approved=True))
+        for side in ('poPrivacy', 'qaPrivacy'):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = pathlib.Path(tmp) / 'fixtures'
+                shutil.copytree(t02.ROOT / 'fixtures', root)
+                manifest = t02.strict_json(root / 'manifest.json')
+                manifest['cases'][0]['approval'][side] = 'PENDING'
+                dump(root / 'manifest.json', manifest)
+                pending = t02.validate(root)
+                self.assertFalse(pending['acceptedCorpus'])
+                self.assertEqual([manifest['cases'][0]['id']], pending['pendingApprovals'])
+                with self.assertRaises(t02.Invalid) as raised:
+                    t02.validate(root, require_approved=True)
+                self.assertEqual('PROVENANCE', raised.exception.rule)
 
     def test_approved_content_plan_and_preserved_bytes(self):
         import subprocess
@@ -88,7 +100,8 @@ class FixtureChecksTest(unittest.TestCase):
         import subprocess
         source = '547bc6c05d3655fd8d02635e038d9f0292b75118'
         reference = 'REVIEW_PO_T02_PRIVACY_SIGNOFF_A'
-        manifest = t02.strict_json(t02.ROOT / 'fixtures/manifest.json')
+        recorded_head = '78a61bfd88c7ffbf96b5f5cffbbc10db52c9afd5'
+        manifest = json.loads(subprocess.check_output(['git', 'show', recorded_head + ':fixtures/manifest.json'], cwd=t02.ROOT))
         prior = json.loads(subprocess.check_output(['git', 'show', source + ':fixtures/manifest.json'], cwd=t02.ROOT))
         evidence = (t02.ROOT / 'docs/fixtures/T02-evidence.md').read_text()
         self.assertIn('## ' + reference, evidence)
@@ -106,10 +119,40 @@ class FixtureChecksTest(unittest.TestCase):
                 source_hashes.append(hashlib.sha256(raw).hexdigest())
             self.assertIn('| `' + case['id'] + '` | `' + source_hashes[0] + '` | `' + source_hashes[1] + '` |', evidence)
         self.assertEqual(expected, manifest)
-        self.assertFalse(t02.validate()['acceptedCorpus'])
-        with self.assertRaises(t02.Invalid) as raised:
-            t02.validate(require_approved=True)
-        self.assertEqual('PROVENANCE', raised.exception.rule)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / 'fixtures'
+            shutil.copytree(t02.ROOT / 'fixtures', root)
+            dump(root / 'manifest.json', manifest)
+            self.assertFalse(t02.validate(root)['acceptedCorpus'])
+            with self.assertRaises(t02.Invalid) as raised:
+                t02.validate(root, require_approved=True)
+            self.assertEqual('PROVENANCE', raised.exception.rule)
+
+    def test_joint_privacy_recording_preserves_both_sources(self):
+        import subprocess
+        po_source = '547bc6c05d3655fd8d02635e038d9f0292b75118'
+        qa_source = '78a61bfd88c7ffbf96b5f5cffbbc10db52c9afd5'
+        reference = 'REVIEW_PO_QA_T02_PRIVACY_SIGNOFF_A'
+        evidence = (t02.ROOT / 'docs/fixtures/T02-evidence.md').read_text()
+        joint = evidence.split('## ' + reference + '\n', 1)[1].split('## Governance', 1)[0]
+        for source, decision in [(po_source, '6336501800'), (qa_source, '6337179703')]:
+            self.assertIn(source, joint)
+            self.assertIn('https://github.com/anhh2j/MoneyMate/issues/14#issuecomment-' + decision, joint)
+        manifest = t02.strict_json(t02.ROOT / 'fixtures/manifest.json')
+        expected = json.loads(subprocess.check_output(['git', 'show', qa_source + ':fixtures/manifest.json'], cwd=t02.ROOT))
+        for case in expected['cases']:
+            self.assertEqual({'poPrivacy': 'APPROVED', 'qaPrivacy': 'PENDING', 'evidenceRef': 'REVIEW_PO_T02_PRIVACY_SIGNOFF_A'}, case['approval'])
+            case['approval'] = {'poPrivacy': 'APPROVED', 'qaPrivacy': 'APPROVED', 'evidenceRef': reference}
+            self.assertTrue(t02.approval_check(case['approval'], case['id']))
+            source_hashes = []
+            for field in ('inputPath', 'expectedPath'):
+                raw = (t02.ROOT / 'fixtures' / case[field]).read_bytes()
+                for source in (po_source, qa_source):
+                    self.assertEqual(raw, subprocess.check_output(['git', 'show', source + ':fixtures/' + case[field]], cwd=t02.ROOT))
+                source_hashes.append(hashlib.sha256(raw).hexdigest())
+            self.assertIn('| `' + case['id'] + '` | `' + source_hashes[0] + '` | `' + source_hashes[1] + '` |', joint)
+        self.assertEqual(expected, manifest)
+        self.assertTrue(t02.validate(require_approved=True)['acceptedCorpus'])
 
     def test_content_oracle_mutations_after_matching_hashes(self):
         def expected_mutation(index, field, value):

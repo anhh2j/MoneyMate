@@ -52,8 +52,8 @@
       ],
       "approval": {
         "poPrivacy": "APPROVED",
-        "qaPrivacy": "PENDING",
-        "evidenceRef": "REVIEW_PO_T02_PRIVACY_SIGNOFF_A"
+        "qaPrivacy": "APPROVED",
+        "evidenceRef": "REVIEW_PO_QA_T02_PRIVACY_SIGNOFF_A"
       }
     },
     {
@@ -106,8 +106,8 @@
       ],
       "approval": {
         "poPrivacy": "APPROVED",
-        "qaPrivacy": "PENDING",
-        "evidenceRef": "REVIEW_PO_T02_PRIVACY_SIGNOFF_A"
+        "qaPrivacy": "APPROVED",
+        "evidenceRef": "REVIEW_PO_QA_T02_PRIVACY_SIGNOFF_A"
       }
     },
     {
@@ -160,8 +160,8 @@
       ],
       "approval": {
         "poPrivacy": "APPROVED",
-        "qaPrivacy": "PENDING",
-        "evidenceRef": "REVIEW_PO_T02_PRIVACY_SIGNOFF_A"
+        "qaPrivacy": "APPROVED",
+        "evidenceRef": "REVIEW_PO_QA_T02_PRIVACY_SIGNOFF_A"
       }
     },
     {
@@ -214,8 +214,8 @@
       ],
       "approval": {
         "poPrivacy": "APPROVED",
-        "qaPrivacy": "PENDING",
-        "evidenceRef": "REVIEW_PO_T02_PRIVACY_SIGNOFF_A"
+        "qaPrivacy": "APPROVED",
+        "evidenceRef": "REVIEW_PO_QA_T02_PRIVACY_SIGNOFF_A"
       }
     },
     {
@@ -268,8 +268,8 @@
       ],
       "approval": {
         "poPrivacy": "APPROVED",
-        "qaPrivacy": "PENDING",
-        "evidenceRef": "REVIEW_PO_T02_PRIVACY_SIGNOFF_A"
+        "qaPrivacy": "APPROVED",
+        "evidenceRef": "REVIEW_PO_QA_T02_PRIVACY_SIGNOFF_A"
       }
     },
     {
@@ -322,8 +322,8 @@
       ],
       "approval": {
         "poPrivacy": "APPROVED",
-        "qaPrivacy": "PENDING",
-        "evidenceRef": "REVIEW_PO_T02_PRIVACY_SIGNOFF_A"
+        "qaPrivacy": "APPROVED",
+        "evidenceRef": "REVIEW_PO_QA_T02_PRIVACY_SIGNOFF_A"
       }
     },
     {
@@ -376,8 +376,8 @@
       ],
       "approval": {
         "poPrivacy": "APPROVED",
-        "qaPrivacy": "PENDING",
-        "evidenceRef": "REVIEW_PO_T02_PRIVACY_SIGNOFF_A"
+        "qaPrivacy": "APPROVED",
+        "evidenceRef": "REVIEW_PO_QA_T02_PRIVACY_SIGNOFF_A"
       }
     },
     {
@@ -430,8 +430,8 @@
       ],
       "approval": {
         "poPrivacy": "APPROVED",
-        "qaPrivacy": "PENDING",
-        "evidenceRef": "REVIEW_PO_T02_PRIVACY_SIGNOFF_A"
+        "qaPrivacy": "APPROVED",
+        "evidenceRef": "REVIEW_PO_QA_T02_PRIVACY_SIGNOFF_A"
       }
     },
     {
@@ -484,8 +484,8 @@
       ],
       "approval": {
         "poPrivacy": "APPROVED",
-        "qaPrivacy": "PENDING",
-        "evidenceRef": "REVIEW_PO_T02_PRIVACY_SIGNOFF_A"
+        "qaPrivacy": "APPROVED",
+        "evidenceRef": "REVIEW_PO_QA_T02_PRIVACY_SIGNOFF_A"
       }
     },
     {
@@ -538,8 +538,8 @@
       ],
       "approval": {
         "poPrivacy": "APPROVED",
-        "qaPrivacy": "PENDING",
-        "evidenceRef": "REVIEW_PO_T02_PRIVACY_SIGNOFF_A"
+        "qaPrivacy": "APPROVED",
+        "evidenceRef": "REVIEW_PO_QA_T02_PRIVACY_SIGNOFF_A"
       }
     },
     {
@@ -592,8 +592,8 @@
       ],
       "approval": {
         "poPrivacy": "APPROVED",
-        "qaPrivacy": "PENDING",
-        "evidenceRef": "REVIEW_PO_T02_PRIVACY_SIGNOFF_A"
+        "qaPrivacy": "APPROVED",
+        "evidenceRef": "REVIEW_PO_QA_T02_PRIVACY_SIGNOFF_A"
       }
     },
     {
@@ -646,8 +646,8 @@
       ],
       "approval": {
         "poPrivacy": "APPROVED",
-        "qaPrivacy": "PENDING",
-        "evidenceRef": "REVIEW_PO_T02_PRIVACY_SIGNOFF_A"
+        "qaPrivacy": "APPROVED",
+        "evidenceRef": "REVIEW_PO_QA_T02_PRIVACY_SIGNOFF_A"
       }
     },
     {
@@ -700,8 +700,8 @@
       ],
       "approval": {
         "poPrivacy": "APPROVED",
-        "qaPrivacy": "PENDING",
-        "evidenceRef": "REVIEW_PO_T02_PRIVACY_SIGNOFF_A"
+        "qaPrivacy": "APPROVED",
+        "evidenceRef": "REVIEW_PO_QA_T02_PRIVACY_SIGNOFF_A"
       }
     },
     {
@@ -754,8 +754,8 @@
       ],
       "approval": {
         "poPrivacy": "APPROVED",
-        "qaPrivacy": "PENDING",
-        "evidenceRef": "REVIEW_PO_T02_PRIVACY_SIGNOFF_A"
+        "qaPrivacy": "APPROVED",
+        "evidenceRef": "REVIEW_PO_QA_T02_PRIVACY_SIGNOFF_A"
       }
     },
     {
@@ -808,8 +808,8 @@
       ],
       "approval": {
         "poPrivacy": "APPROVED",
-        "qaPrivacy": "PENDING",
-        "evidenceRef": "REVIEW_PO_T02_PRIVACY_SIGNOFF_A"
+        "qaPrivacy": "APPROVED",
+        "evidenceRef": "REVIEW_PO_QA_T02_PRIVACY_SIGNOFF_A"
       }
     }
   ],
