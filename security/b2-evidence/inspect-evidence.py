@@ -23,11 +23,9 @@ def inspect():
     xmls = list((ROOT / 'security/build/outputs/androidTest-results').rglob('*.xml'))
     totals = dict(tests=0, failures=0, errors=0, skipped=0)
     for path in xmls:
-        suite = ET.parse(path).getroot()
-        if suite.tag != 'testsuite':
-            continue
-        for key in totals:
-            totals[key] += int(suite.get(key, 0))
+        for suite in ET.parse(path).getroot().iter('testsuite'):
+            for key in totals:
+                totals[key] += int(suite.get(key, 0))
     assert totals == dict(tests=6, failures=0, errors=0, skipped=0), totals
     assert (REPORT / 'instrumented-exit.txt').read_text().strip() == '0'
     metrics = [json.loads(s) for s in (REPORT / 'metrics.jsonl').read_text().splitlines() if s.strip()]

@@ -8,6 +8,8 @@ Reproduce with Java17, the existing SDK37/build-tools37 configuration and an And
 API26/29/33/35 x86_64 emulator: strict :security:assembleDebugAndroidTest, then
 `bash security/b2-evidence/run-instrumented.sh`. The isolated workflow performs these
 commands and uploads source identity, exact exit codes, JUnit XML, metrics and test APK.
+Metrics use a dedicated B2_METRIC logcat tag containing numbers/status only, never
+password/salt/hash. AGP removes the test APK after execution; no run-as assumption.
 The existing CI workflow is untouched and must still pass its original checks.
 
 Known-answer reference: upstream Argon2Kt v1.6.0, commit

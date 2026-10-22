@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import android.os.Debug
 import android.os.SystemClock
+import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.lambdapioneer.argon2kt.Argon2Exception
@@ -14,6 +15,7 @@ import com.lambdapioneer.argon2kt.Argon2Version
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -61,10 +63,10 @@ class Argon2CompatibilityTest {
 
     @Test
     fun malformedInputsRejected() {
-        expectRejected { derive(256, salt = "short") }
-        expectRejected { derive(0) }
-        expectRejected { derive(256, iterations = 0) }
-        expectRejected { Argon2Kt().verify(mode, "SYNTHETIC_INVALID_ENCODING", "password".toByteArray()) }
+        assertThrows(Argon2Exception::class.java) { derive(256, salt = "short") }
+        assertThrows(IllegalArgumentException::class.java) { derive(0) }
+        assertThrows(IllegalArgumentException::class.java) { derive(256, iterations = 0) }
+        assertThrows(Argon2Exception::class.java) { Argon2Kt().verify(mode, "SYNTHETIC_INVALID_ENCODING", "password".toByteArray()) }
         metric(JSONObject().put("case", "MALFORMED_REJECTED").put("result", "PASS"))
     }
 
@@ -125,16 +127,6 @@ class Argon2CompatibilityTest {
         version = Argon2Version.V13,
     )
 
-    private fun expectRejected(operation: () -> Any) {
-        var rejected = false
-        try {
-            operation()
-        } catch (_: Argon2Exception) {
-            rejected = true
-        }
-        assertTrue("Invalid synthetic input must be rejected", rejected)
-    }
-
     private fun memorySnapshot(): JSONObject {
         val runtime = Runtime.getRuntime()
         val manager =
@@ -156,9 +148,6 @@ class Argon2CompatibilityTest {
             .put("abis", Build.SUPPORTED_ABIS.joinToString(","))
             .put("scope", "B2_TEST_ONLY")
             .put("r8", "NOT-VERIFIED")
-        val context = InstrumentationRegistry.getInstrumentation().context
-        context.openFileOutput("b2-metrics.jsonl", Context.MODE_APPEND).bufferedWriter().use {
-            it.appendLine(value.toString())
-        }
+        Log.i("B2_METRIC", value.toString())
     }
 }
