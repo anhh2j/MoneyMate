@@ -720,5 +720,37 @@
     "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common/2.3.1/lifecycle-common-2.3.1.jar",
     "publishedSha1Matches": true,
     "resolvedBy": "39802698884 job 119907505542 strict compile/lint verification report"
+  },
+  {
+    "component": "androidx.collection:collection:1.1.0",
+    "artifact": "collection-1.1.0.jar",
+    "sha256": "632a0e5407461de774409352940e292a291037724207a787820c77daf7d33b72",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/collection/collection/1.1.0/collection-1.1.0.jar",
+    "publishedSha1Matches": true,
+    "resolvedBy": "39803857527 job 119911713498 runtime strict verification report"
+  },
+  {
+    "component": "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1",
+    "artifact": "kotlinx-coroutines-android-1.8.1.jar",
+    "sha256": "a134dacf4e6578b29b32e97aa50548d09cb45e3cb3551ce77ac27e55e265d8f5",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-android/1.8.1/kotlinx-coroutines-android-1.8.1.jar",
+    "publishedSha1Matches": true,
+    "resolvedBy": "39803857527 job 119911713498 runtime strict verification report"
+  },
+  {
+    "component": "androidx.lifecycle:lifecycle-common:2.6.2",
+    "artifact": "lifecycle-common-2.6.2.jar",
+    "sha256": "f34831b6c71cd844e1d35d1be49d5e79447c5ab856346531b1e8676fda7374b1",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common/2.6.2/lifecycle-common-2.6.2.jar",
+    "publishedSha1Matches": true,
+    "resolvedBy": "39803857527 job 119911713498 runtime strict verification report"
+  },
+  {
+    "component": "androidx.resourceinspection:resourceinspection-annotation:1.0.1",
+    "artifact": "resourceinspection-annotation-1.0.1.jar",
+    "sha256": "8cff870ec6fb31db48a52f4a792335b4bf8de07e03bd37823181526433ccd5cb",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/resourceinspection/resourceinspection-annotation/1.0.1/resourceinspection-annotation-1.0.1.jar",
+    "publishedSha1Matches": true,
+    "resolvedBy": "39803857527 job 119911713498 runtime strict verification report"
   }
 ]
