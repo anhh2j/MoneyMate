@@ -11,10 +11,12 @@ class FixtureLoader {
         val provenanceKind: String,
         val inputBytes: ByteArray,
         val expectedBytes: ByteArray,
-        val packageName: String,
-        val title: String,
-        val body: String,
+        private val fields: Triple<String, String, String>,
     ) {
+        val packageName: String get() = fields.first
+        val title: String get() = fields.second
+        val body: String get() = fields.third
+
         override fun toString(): String = "LoadedFixture(id=$id)"
     }
 
@@ -47,9 +49,7 @@ class FixtureLoader {
             kind,
             raw,
             resource(expected),
-            parts.first,
-            parts.second,
-            parts.third,
+            parts,
         )
     }
 
@@ -62,7 +62,10 @@ class FixtureLoader {
     private fun fields(
         json: String,
         name: String,
-    ): List<String> = Regex("\"$name\"\\s*:\\s*\"([A-Za-z0-9_./:-]+)\"").findAll(json).map { it.groupValues[1] }.toList()
+    ): List<String> {
+        val pattern = Regex("\"$name\"\\s*:\\s*\"([A-Za-z0-9_./:-]+)\"")
+        return pattern.findAll(json).map { it.groupValues[1] }.toList()
+    }
 
     private fun resource(path: String): ByteArray {
         require(SAFE_PATH.matches(path) && !path.contains("..") && !path.startsWith("/")) { "RESOURCE_PATH" }

@@ -47,7 +47,9 @@ class FixtureLoaderTest {
                 val parsed = loader.splitHeader(text.toByteArray(StandardCharsets.UTF_8))
                 assertEquals("test", parsed.first)
                 assertEquals("SYNTHETIC_TITLE", parsed.second)
-                assertArrayEquals(body.toByteArray(StandardCharsets.UTF_8), parsed.third.toByteArray(StandardCharsets.UTF_8))
+                val expectedBody = body.toByteArray(StandardCharsets.UTF_8)
+                val actualBody = parsed.third.toByteArray(StandardCharsets.UTF_8)
+                assertArrayEquals(expectedBody, actualBody)
             }
         }
         assertThrows(IllegalArgumentException::class.java) {
