@@ -25,9 +25,15 @@ FixtureLoader extracts only restricted safe manifest string fields after indepen
 
 Local: `python3 scripts/t02_fixture_checks.py --report build/reports/t02/fixture-validation.json`; `python3 -m unittest discover -s scripts/tests -p 'test_t02_fixture_checks.py' -v`; ktlint formatter/checker on the two new Kotlin files and parser Gradle resource mapping; `git diff --check`. CI runs the full baseline gates unchanged plus these commands and scans both generated debug/R8 APKs. Reports: `build/reports/t02/fixture-validation.json`, `negative-controls.json`, `apk-isolation.json` and logs in test-lint-dod-reports. JUnit XML is in parser build/test-results/test. Original hashes compared after every negative mutation; no invalid fixture is uploaded. Canary negative controls are temporary synthetic data only. Legacy QA tool emits ResourceWarning for its existing unclosed file reads when Python warnings are enabled; qa/ is unchanged.
 
-## Known blocker — unchanged baseline review packager
+## T02-P01 — sửa accounting packager theo ngoại lệ file thứ42
 
-At main, `scripts/t00b_review_evidence.py` lines around verify_junit require exactly 20 JUnit tests. T02 adds two real loader tests, so expected total is 22; `.github/check_skeleton.py` derives the count from source and supports these tests, but the unchanged packager will reject 22. Packager is outside this 41-file allowlist: not modified and not cherry-picked from PR #10. No test is removed/skipped, no result rewritten, and no alternate package is used to impersonate a passing baseline gate. CI/runtime evidence will be handed off with this blocker if reproduced. Root CI and source-review-package/C07 remain NOT VERIFIED until the actual run result; no synthetic pack acceptance is claimed.
+Leader đã duyệt tại Issue #14, comment 6334175682: tổng allowlist 42 file; đường dẫn bổ sung duy nhất là `scripts/t00b_review_evidence.py`. Bản gốc ở main ghim 20 tests; CI 39731261384 đã có 22 tests sạch nhưng dừng trước source-review-package/C07. Đây là lỗi lịch sử được giữ nguyên trong evidence, không chuyển thành PASS.
+
+Packager hiện trích chính xác identity từ source snapshot đã lấy bằng Git HEAD: module + Gradle task + variant + class + method, kèm sourceSet/path/SHA-256. JUnit XML được đối chiếu toàn bộ theo vị trí module/build/test-results/task, tên suite/file/class/method, summary và outcome; không ghim 22, không dùng ngưỡng >=20. Source set/annotation không hỗ trợ, source hoặc XML trùng/thiếu/thừa, sai module/task/variant/class/method, XML hỏng, failure/error/skip đều bị từ chối. Chỉ hỗ trợ JUnit4 Kotlin thường đang được pipeline thực chạy; dạng mới không suy diễn mà fail closed.
+
+`review/junit-inventory.json` ghi HEAD/tree, inventory source/variant, từng XML path/hash và kết quả khớp. Kiểm source tree, checksum, APK/emulator và các cổng security/C07/C09 giữ nguyên. Không cherry-pick hoặc sửa PR #10, không sửa qa/.
+
+Test bổ sung nằm trong file selftest Dev đã được phép: hồi quy 20 tests tại baseline và 22 tests T02, 13 mutation âm tính, cùng probe tạm cho Android testDebug hợp nhất với test base; không sửa source/test thật để làm probe. Các ca kiểm này xuất `build/reports/t02/packager-negative-controls.json`. Local đã đối chiếu thêm 13 XML thật của CI trước: 22/22 identity khớp, không failure/error/skip. CI mới phải chạy đầy đủ để xác nhận đóng gói/C07; trước khi có kết quả thì vẫn NOT VERIFIED. Nguồn synthetic và 15 signoff vẫn PENDING, T02-REAL-CORPUS vẫn BLOCKED. Tất cả bình luận bàn giao mới trên GitHub dùng tiếng Việt theo yêu cầu PO.
 
 ## Governance and handover
 

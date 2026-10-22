@@ -197,8 +197,109 @@ class FixtureChecksTest(unittest.TestCase):
         self.assertEqual(before, hashes(t02.ROOT / 'fixtures'))
 
 
+PACKAGER_SPEC = importlib.util.spec_from_file_location(
+    't02_packager', pathlib.Path(__file__).resolve().parents[1] / 't00b_review_evidence.py')
+packager = importlib.util.module_from_spec(PACKAGER_SPEC)
+PACKAGER_SPEC.loader.exec_module(packager)
+PACKAGER_ROWS = []
+
+
+class PackagerIdentityTest(unittest.TestCase):
+    def snapshot(self, target, ref):
+        import subprocess
+        names = subprocess.check_output(['git', 'ls-tree', '-r', '--name-only', ref], cwd=t02.ROOT, text=True).splitlines()
+        for name in names:
+            if name.endswith('.kt') or name.endswith('/build.gradle.kts'):
+                destination = target / name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(subprocess.check_output(['git', 'show', ref + ':' + name], cwd=t02.ROOT))
+
+    def xml_from_inventory(self, source, artifacts):
+        groups = {}
+        for key in packager.junit_source_inventory(source):
+            groups.setdefault(key[:4], []).append(key[4])
+        for (module, task, variant, classname), methods in groups.items():
+            suite = ET.Element('testsuite', name=classname, tests=str(len(methods)), failures='0', errors='0', skipped='0')
+            for name in methods:
+                ET.SubElement(suite, 'testcase', classname=classname, name=name)
+            path = artifacts / module / 'build/test-results' / task / ('TEST-' + classname + '.xml')
+            path.parent.mkdir(parents=True, exist_ok=True)
+            ET.ElementTree(suite).write(path)
+
+    def test_baseline_twenty_and_current_twenty_two(self):
+        for label, ref, count in [('baseline', '4570e4e3cece382e5a69fa277046628c05f0aa07', 20), ('T02', '63f5e18ffb3fb0d472539825fd23d887598905bc', 22)]:
+            with tempfile.TemporaryDirectory(prefix='t02-junit-source-') as tmp:
+                source, artifacts = pathlib.Path(tmp) / 'source', pathlib.Path(tmp) / 'artifacts'
+                self.snapshot(source, ref)
+                self.xml_from_inventory(source, artifacts)
+                totals, evidence = packager.verify_junit_inventory(source, artifacts)
+                self.assertEqual(count, totals['tests'])
+                self.assertEqual(count, len(evidence['inventory']))
+                self.assertEqual(len(evidence['inventory']), len({(x['module'], x['task'], x['variant'], x['class'], x['method']) for x in evidence['inventory']}))
+                PACKAGER_ROWS.append({'case': label, 'expectedTests': count, 'actualTests': totals['tests'], 'result': 'PASS'})
+
+    def test_identity_negative_controls(self):
+        cases = ['missing', 'extra', 'duplicate', 'module', 'variant', 'classname', 'malformed', 'summary', 'failure', 'error', 'skipped', 'source-set', 'source-method']
+        for label in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory(prefix='t02-junit-mutation-') as tmp:
+                source, artifacts = pathlib.Path(tmp) / 'source', pathlib.Path(tmp) / 'artifacts'
+                self.snapshot(source, '63f5e18ffb3fb0d472539825fd23d887598905bc')
+                self.xml_from_inventory(source, artifacts)
+                before = hashes(artifacts)
+                path = next((artifacts / 'parser').rglob('*FixtureLoaderTest.xml'))
+                suite = ET.parse(path).getroot()
+                if label == 'missing':
+                    suite.remove(suite.find('testcase')); suite.set('tests', str(len(suite.findall('testcase'))))
+                elif label == 'extra':
+                    ET.SubElement(suite, 'testcase', classname=suite.get('name'), name='SYNTHETIC_EXTRA'); suite.set('tests', '3')
+                elif label == 'duplicate':
+                    suite.append(copy.deepcopy(suite.find('testcase'))); suite.set('tests', '3')
+                elif label in ('module', 'variant'):
+                    destination = artifacts / ('dedup' if label == 'module' else 'parser') / 'build/test-results' / ('test' if label == 'module' else 'testReleaseUnitTest') / path.name
+                    destination.parent.mkdir(parents=True, exist_ok=True); path.rename(destination)
+                elif label == 'classname':
+                    suite.find('testcase').set('classname', 'SYNTHETIC_WRONG_CLASS')
+                elif label == 'malformed':
+                    path.write_text('<broken')
+                elif label == 'summary':
+                    suite.set('tests', '999')
+                elif label in ('failure', 'error', 'skipped'):
+                    ET.SubElement(suite.find('testcase'), label)
+                elif label == 'source-set':
+                    directory = source / 'parser/src/test'
+                    directory.rename(directory.with_name('testDebug'))
+                else:
+                    path_source = source / 'parser/src/test/kotlin/com/app/moneymate/parser/fixtures/FixtureLoaderTest.kt'
+                    path_source.write_text(path_source.read_text().replace('manifestOrderAndDoubleLoadPreserveEveryByte', 'SYNTHETIC_CHANGED_METHOD'))
+                if label not in ('module', 'variant', 'malformed'):
+                    ET.ElementTree(suite).write(path)
+                expected_reason = {'missing': 'XML_MISSING', 'extra': 'XML_EXTRA', 'duplicate': 'XML_DUPLICATE', 'module': 'XML_EXTRA', 'variant': 'XML_VARIANT', 'classname': 'XML_CLASS', 'malformed': 'XML_MALFORMED', 'summary': 'XML_COUNTS', 'failure': 'XML_OUTCOME', 'error': 'XML_OUTCOME', 'skipped': 'XML_OUTCOME', 'source-set': 'SOURCE_SET', 'source-method': 'XML_EXTRA'}[label]
+                with self.assertRaises(packager.JunitEvidenceError) as error:
+                    packager.verify_junit_inventory(source, artifacts)
+                self.assertEqual(expected_reason, str(error.exception))
+                PACKAGER_ROWS.append({'case': label, 'expected': expected_reason, 'observed': str(error.exception), 'result': 'PASS', 'temporaryOnly': True})
+                self.assertTrue(before)
+
+    def test_android_debug_sources_and_annotation_literals(self):
+        with tempfile.TemporaryDirectory(prefix='t02-junit-variant-') as tmp:
+            source, artifacts = pathlib.Path(tmp) / 'source', pathlib.Path(tmp) / 'artifacts'
+            self.snapshot(source, '63f5e18ffb3fb0d472539825fd23d887598905bc')
+            new_source = source / 'capture/src/testDebug/kotlin/synthetic/VariantTest.kt'
+            new_source.parent.mkdir(parents=True, exist_ok=True)
+            new_source.write_text('package synthetic\nimport org.junit.Test\nclass VariantTest {\n@Test fun syntheticDebugCase() {}\nval literal = "@Test fun fake()"\n/* @Test fun ignoredComment() {} */\n}\n')
+            self.xml_from_inventory(source, artifacts)
+            totals, evidence = packager.verify_junit_inventory(source, artifacts)
+            entry = next(x for x in evidence['inventory'] if x['method'] == 'syntheticDebugCase')
+            self.assertEqual(('capture', 'testDebugUnitTest', 'debugUnitTest', 'testDebug'), (entry['module'], entry['task'], entry['variant'], entry['sourceSet']))
+            self.assertEqual(23, totals['tests'])
+            PACKAGER_ROWS.append({'case': 'android-testDebug-plus-base', 'result': 'PASS', 'temporaryOnly': True})
+
+
 def tearDownModule():
     # Missing, skipped, crashed or unrecorded controls make the whole selftest fail.
     t02.verify_control_evidence(ROWS)
     output = t02.ROOT / 'build/reports/t02/negative-controls.json'
     t02.write_report(output, {'result': 'PASS', 'controls': ROWS, 'originalCorpusUnchanged': True})
+    if len(PACKAGER_ROWS) != 16 or any(r['result'] != 'PASS' for r in PACKAGER_ROWS):
+        raise AssertionError('PACKAGER_EVIDENCE_MISSING')
+    t02.write_report(t02.ROOT / 'build/reports/t02/packager-negative-controls.json', {'result': 'PASS', 'cases': PACKAGER_ROWS})
