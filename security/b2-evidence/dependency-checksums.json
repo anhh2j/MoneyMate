@@ -1,0 +1,44 @@
+[
+  {
+    "component": "com.lambdapioneer.argon2kt:argon2kt:1.6.0",
+    "artifact": "argon2kt-1.6.0.aar",
+    "sha256": "38a145241b70a0ad1d0af10732394428f46106e637c2e946a63e2afd7dd3b5d2",
+    "url": "https://repo.maven.apache.org/maven2/com/lambdapioneer/argon2kt/argon2kt/1.6.0/argon2kt-1.6.0.aar"
+  },
+  {
+    "component": "com.lambdapioneer.argon2kt:argon2kt:1.6.0",
+    "artifact": "argon2kt-1.6.0.pom",
+    "sha256": "39ee4f667e27bd04c25217d2ad6378136f7d2345ef758a91d43cd9923bb0112f",
+    "url": "https://repo.maven.apache.org/maven2/com/lambdapioneer/argon2kt/argon2kt/1.6.0/argon2kt-1.6.0.pom"
+  },
+  {
+    "component": "com.lambdapioneer.argon2kt:argon2kt:1.6.0",
+    "artifact": "argon2kt-1.6.0.module",
+    "sha256": "4d22e9810427f7df3588adeec9c7cc24747fca61c733bb0a5bf8daa5e16b81f8",
+    "url": "https://repo.maven.apache.org/maven2/com/lambdapioneer/argon2kt/argon2kt/1.6.0/argon2kt-1.6.0.module"
+  },
+  {
+    "component": "androidx.test:runner:1.7.0",
+    "artifact": "runner-1.7.0.aar",
+    "sha256": "970311c47119928a2e406a88892a3d270387cc5a49a181a1c44511105b41b818",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/test/runner/1.7.0/runner-1.7.0.aar"
+  },
+  {
+    "component": "androidx.test:runner:1.7.0",
+    "artifact": "runner-1.7.0.pom",
+    "sha256": "622831c6d31666fb3438cb0d2ee1fbbbc78cabcd49717699578d92550062207f",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/test/runner/1.7.0/runner-1.7.0.pom"
+  },
+  {
+    "component": "androidx.test.ext:junit:1.3.0",
+    "artifact": "junit-1.3.0.aar",
+    "sha256": "3363df84da4540ba8daff02c3f7cd65471037a6a5370591a7e6deba377b36e7f",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/test/ext/junit/1.3.0/junit-1.3.0.aar"
+  },
+  {
+    "component": "androidx.test.ext:junit:1.3.0",
+    "artifact": "junit-1.3.0.pom",
+    "sha256": "92af7f253e5eabe2caec5c56f308312653d123042b22754d6ff664e1752dcf3f",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/test/ext/junit/1.3.0/junit-1.3.0.pom"
+  }
+]
