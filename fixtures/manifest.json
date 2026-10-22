@@ -224,7 +224,7 @@
       "caseType": "noise_promotion_01",
       "inputPath": "bidv/noise_promotion_01.txt",
       "expectedPath": "bidv/noise_promotion_01.expected.json",
-      "inputSha256": "a7c6:620c:a2a0:db0e:b6c2:61d8:da34:00ab:85fa:f91c:e098:90bc:91cb:0f48:82e6:c67f",
+      "inputSha256": "7b9f:0a58:8af3:842c:32f4:966d:e82c:d30a:ccc5:013f:68d2:ea76:1e11:a088:a560:f9c9",
       "expectedSha256": "3f30:c2ab:ac24:eb97:79ee:be3b:1476:e830:f8f2:eec6:9672:fda9:344b:a9e4:2ff6:26be",
       "provenance": {
         "kind": "synthetic_contract",
@@ -278,7 +278,7 @@
       "caseType": "txn_in_01",
       "inputPath": "msb/txn_in_01.txt",
       "expectedPath": "msb/txn_in_01.expected.json",
-      "inputSha256": "cf08:3988:5305:3987:171e:c309:a382:ae0f:c0fc:7381:78c9:7c40:5e30:303a:32cd:05e6",
+      "inputSha256": "f62d:a300:b938:9922:45a2:99ca:c5f2:df99:9a28:3c61:53d6:3b7d:63ff:b432:a7a1:4c38",
       "expectedSha256": "7721:ffd2:7493:1e6d:83de:edf1:105e:ef7f:276c:f11c:a8f8:3170:52c9:7713:2bab:9cdf",
       "provenance": {
         "kind": "synthetic_contract",
@@ -548,7 +548,7 @@
       "caseType": "txn_in_01",
       "inputPath": "mb/txn_in_01.txt",
       "expectedPath": "mb/txn_in_01.expected.json",
-      "inputSha256": "5275:be1c:f35d:fb15:082f:37c1:a7a1:1aa0:41a9:9052:6a5b:4010:67d8:4fde:d069:2d02",
+      "inputSha256": "0cac:6f13:0deb:402b:d560:4a7a:e976:ff61:a06f:0dfa:aa1c:649c:3461:9afb:da08:7b95",
       "expectedSha256": "7721:ffd2:7493:1e6d:83de:edf1:105e:ef7f:276c:f11c:a8f8:3170:52c9:7713:2bab:9cdf",
       "provenance": {
         "kind": "synthetic_contract",
@@ -602,7 +602,7 @@
       "caseType": "txn_out_01",
       "inputPath": "mb/txn_out_01.txt",
       "expectedPath": "mb/txn_out_01.expected.json",
-      "inputSha256": "b24f:36e2:dd4d:c5c1:08e6:9dbf:a245:e3a5:5797:bc7b:7ad1:c557:d6cd:81ed:ba70:d6b7",
+      "inputSha256": "3cfa:c7cc:bf08:4200:b939:ed18:bcab:6ad3:a014:bc66:1a04:36a1:a167:fe3d:fff8:4b9c",
       "expectedSha256": "a7be:11dc:6170:8f93:08a5:8596:c678:4119:6f55:e361:4900:b505:3cc3:f13e:b5a3:70bc",
       "provenance": {
         "kind": "synthetic_contract",
@@ -656,7 +656,7 @@
       "caseType": "invalid_missing_amount_01",
       "inputPath": "mb/invalid_missing_amount_01.txt",
       "expectedPath": "mb/invalid_missing_amount_01.expected.json",
-      "inputSha256": "2ac8:5160:5a07:6e0e:4467:7335:b61a:a366:96ae:2a3d:bab9:3e01:df36:c066:953f:5508",
+      "inputSha256": "ff2f:be7e:b288:c46c:bd5c:dff7:b1ed:0d69:a857:6f2d:dcc4:7e0a:97fb:df0c:dccc:e422",
       "expectedSha256": "07a2:187e:8b8c:00f7:99fb:27c8:38cd:63be:b1ea:b25b:1778:0277:95bb:337d:1895:fb9f",
       "provenance": {
         "kind": "synthetic_contract",
@@ -710,7 +710,7 @@
       "caseType": "noise_notice_01",
       "inputPath": "mb/noise_notice_01.txt",
       "expectedPath": "mb/noise_notice_01.expected.json",
-      "inputSha256": "e104:30f3:5db4:2f0e:2c0d:97eb:f300:e8e3:34ab:eaab:cdf4:ff36:55d2:06a8:86a0:e317",
+      "inputSha256": "27f2:906b:0939:ceac:7c78:232a:24b6:9f07:909a:0a17:8c6b:8f1c:8da4:d90e:5545:3475",
       "expectedSha256": "3f30:c2ab:ac24:eb97:79ee:be3b:1476:e830:f8f2:eec6:9672:fda9:344b:a9e4:2ff6:26be",
       "provenance": {
         "kind": "synthetic_contract",
@@ -764,7 +764,7 @@
       "caseType": "noise_promotion_01",
       "inputPath": "mb/noise_promotion_01.txt",
       "expectedPath": "mb/noise_promotion_01.expected.json",
-      "inputSha256": "d15f:ba36:91d9:fe9e:be71:ca6b:b9f5:e18d:cf06:e27d:65d0:12eb:f552:66e1:c9dc:65d7",
+      "inputSha256": "174f:ce69:1eeb:4e16:be88:6b68:f4fb:246b:edc7:42cf:3550:d88b:2efa:4def:864c:e988",
       "expectedSha256": "3f30:c2ab:ac24:eb97:79ee:be3b:1476:e830:f8f2:eec6:9672:fda9:344b:a9e4:2ff6:26be",
       "provenance": {
         "kind": "synthetic_contract",

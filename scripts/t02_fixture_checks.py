@@ -251,6 +251,53 @@ def scenarios_check(doc, case_map, expected_map):
             require(p.get('expectedDelivery') == 'METADATA_ONLY' and 'value' not in p and 'field' not in p, 'CONSENT', ident)
 
 
+def content_plan_check(case, expected, title, body):
+    """Đối chiếu dữ liệu test với CONTENT PLAN, không phải parser production."""
+    ident, bank, kind = case['id'], case['bankCode'], case['caseType']
+    text = body.removesuffix('\n')
+    if kind.startswith('txn_'):
+        require(expected['parse'] is True, 'ORACLE', ident)
+        sign = '+' if kind == 'txn_in_01' else '-'
+        require(expected['direction'] == ('IN' if sign == '+' else 'OUT'), 'ORACLE', ident)
+        require(isinstance(expected.get('description'), str) and expected['description'].startswith('SYNTHETIC_'), 'ORACLE', ident)
+        amount, balance, memo = expected['amount'], expected.get('balanceAfter'), expected['description']
+        require(type(balance) is int, 'ORACLE', ident)
+        if bank == 'BIDV':
+            wanted = f'Tài khoản thanh toán: XXX\nSố tiền GD: {sign}{amount:,} VND\nSố dư cuối: {balance:,} VND\nNội dung giao dịch: {memo}'
+            family = 'BIDV_FOUR_LABELS'
+        elif bank == 'MSB':
+            wanted = f'{sign}{amount:,} VND\ntài khoản: XXX\nSo du: {balance:,} VND\nNoi dung: {memo}'
+            family = 'MSB_FOUR_LINES'
+        else:
+            require(title == 'MB Bank - Biến động số dư', 'ORACLE', ident)
+            wanted = f'TK XXX | {sign}{amount:,}VND lúc 00:00 01/01/2000. GD: {memo}. SD: {balance:,}VND.'
+            family = 'MB_BALANCE_UX'
+        require(text == wanted, 'ORACLE', ident)
+    elif kind == 'invalid_missing_amount_01':
+        require(expected['parse'] is None and expected.get('decisionId') == 'T04_MISSING_AMOUNT', 'ORACLE', ident)
+        family = 'MISSING_AMOUNT_CONTRACT'
+        if bank == 'MB':
+            require(title == 'MB Bank - Biến động số dư', 'ORACLE', ident)
+            require(text == 'TK XXX | +VND lúc 00:00 01/01/2000. GD: SYNTHETIC_MEMO_A. SD: 875,000VND.', 'ORACLE', ident)
+            family = 'MB_MISSING_AMOUNT_UX'
+    else:
+        require(expected['parse'] is False, 'ORACLE', ident)
+        family = 'NOISE_CONTRACT'
+        if kind == 'noise_promotion_01' and bank in ('BIDV', 'MB'):
+            require(title.startswith('🎁 ') and 'SYNTHETIC_' in title, 'ORACLE', ident)
+            require('SYNTHETIC_' in text and ('BIDV SmartBanking' if bank == 'BIDV' else 'app MB Bank') in text, 'ORACLE', ident)
+            require(('QR Pay' if bank == 'BIDV' else 'điện/nước') in text, 'ORACLE', ident)
+            family = bank + '_MARKETING_UX'
+        elif kind == 'noise_notice_01' and bank == 'MB':
+            require(title == 'MB Bank - Xác thực giao dịch', 'ORACLE', ident)
+            require(text == 'Yêu cầu xác thực giao dịch SYNTHETIC_REQUEST_A. Vui lòng nhấn vào đây để phê duyệt bằng Digital OTP.', 'ORACLE', ident)
+            family = 'MB_DIGITAL_OTP_PUSH_NO_REAL_OTP'
+    return {'id': ident, 'family': family, 'status': 'PASS',
+            'uxReference': 'PO_UX_REFERENCE_UNVERIFIED', 'provenance': case['provenance']['kind'],
+            'formatVerification': case['formatVerification'], 'poPrivacy': case['approval']['poPrivacy'],
+            'qaPrivacy': case['approval']['qaPrivacy']}
+
+
 def validate(root=ROOT / 'fixtures', require_approved=False):
     root = pathlib.Path(root)
     manifest = strict_json(file_path(root, 'manifest.json'))
@@ -265,6 +312,7 @@ def validate(root=ROOT / 'fixtures', require_approved=False):
     documents = {'manifest.json': manifest, 'schema.json': schema, 'scenarios.json': scenarios}
     case_map, expected_map, pending, unresolved = {}, {}, [], []
     inventory = []
+    content_rows = []
     for c in manifest['cases']:
         keys(c, DEFINITIONS['case'])
         ident = c['id']
@@ -293,6 +341,7 @@ def validate(root=ROOT / 'fixtures', require_approved=False):
         require(c['inputSha256'] == digest(input_path) and c['expectedSha256'] == digest(expected_path), 'INTEGRITY', ident)
         issue = detect(raw.decode('utf-8'))
         require(issue is None, issue or 'PRIVACY', ident)
+        content_rows.append((c, expected, title, body))
         inventory.append({'id': ident, 'inputSha256': c['inputSha256'], 'expectedSha256': c['expectedSha256'], 'provenance': c['provenance']['kind']})
     require(actual == expected_files, 'INVENTORY')
     require(len(case_map) == 15 and all(sum(c['bankCode'] == b for c in case_map.values()) == 5 for b in BANKS), 'INVENTORY')
@@ -309,11 +358,14 @@ def validate(root=ROOT / 'fixtures', require_approved=False):
     readme = file_path(root, 'README.md').read_text()
     require(readme.startswith('# SYNTHETIC_CONTRACT') and 'không case nào' in readme.lower(), 'PROVENANCE')
     require(detect(readme) is None, 'PRIVACY')
+    content_inventory = [content_plan_check(*row) for row in content_rows]
+    content_counts = {name: sum(e['parse'] is state for e in expected_map.values())
+                      for name, state in [('transactions', True), ('noise', False), ('missingAmount', None)]}
     scenario_unresolved = [s['id'] for s in scenarios['scenarios'] if s['oracleMode'] == 'UNRESOLVED']
     result = {'validation': 'PASS', 'corpusClass': manifest['corpusClass'], 'acceptedCorpus': not pending,
               'pendingApprovals': pending, 'unresolvedOracles': unresolved, 'unresolvedScenarios': scenario_unresolved,
               'largeNumericStress': 'BLOCKED_PENDING_EXACT_VALUE_APPROVAL', 'realCorpus': 'BLOCKED',
-              'inventory': inventory, 'scenarioCount': len(scenarios['scenarios']), 'privacyExceptions': len(allowed)}
+              'inventory': inventory, 'contentInventory': content_inventory, 'contentCounts': content_counts, 'scenarioCount': len(scenarios['scenarios']), 'privacyExceptions': len(allowed)}
     require(not require_approved or not pending, 'PROVENANCE')
     return result
 

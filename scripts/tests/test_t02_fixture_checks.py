@@ -63,6 +63,50 @@ class FixtureChecksTest(unittest.TestCase):
         with self.assertRaises(t02.Invalid):
             t02.validate(require_approved=True)
 
+    def test_approved_content_plan_and_preserved_bytes(self):
+        import subprocess
+        result = t02.validate()
+        self.assertEqual({'transactions': 6, 'noise': 6, 'missingAmount': 3}, result['contentCounts'])
+        self.assertEqual(15, len(result['contentInventory']))
+        manifest = t02.strict_json(t02.ROOT / 'fixtures/manifest.json')
+        prior = json.loads(subprocess.check_output(['git', 'show', 'c5a67c2:fixtures/manifest.json'], cwd=t02.ROOT))
+        edited = {'bidv_noise_promotion_01', 'msb_txn_in_01', 'mb_txn_in_01', 'mb_txn_out_01', 'mb_invalid_missing_amount_01', 'mb_noise_notice_01', 'mb_noise_promotion_01'}
+        for case, old in zip(manifest['cases'], prior['cases']):
+            self.assertEqual(old['id'], case['id'])
+            for key in case:
+                if key != 'inputSha256':
+                    self.assertEqual(old[key], case[key])
+            for field in ('inputPath', 'expectedPath'):
+                if field == 'expectedPath' or case['id'] not in edited:
+                    before = subprocess.check_output(['git', 'show', 'c5a67c2:fixtures/' + case[field]], cwd=t02.ROOT)
+                    self.assertEqual(before, (t02.ROOT / 'fixtures' / case[field]).read_bytes())
+        for bank in ('bidv', 'mb'):
+            _, title, _, _ = t02.parse_text(t02.ROOT / 'fixtures' / bank / 'noise_promotion_01.txt')
+            self.assertTrue(title.startswith('🎁 '))
+
+    def test_content_oracle_mutations_after_matching_hashes(self):
+        def expected_mutation(index, field, value):
+            def mutate(root, manifest, _):
+                p = root / manifest['cases'][index]['expectedPath']
+                expected = t02.strict_json(p); expected[field] = value; dump(p, expected)
+            return mutate
+        self.control('NC-04', 'content-mb-amount', 'ORACLE', expected_mutation(10, 'amount', 125001))
+        self.control('NC-04', 'content-bidv-balance', 'ORACLE', expected_mutation(0, 'balanceAfter', 875001))
+        self.control('NC-04', 'content-mb-memo', 'ORACLE', expected_mutation(11, 'description', 'SYNTHETIC_OTHER'))
+        def text_mutation(index, old, new):
+            def mutate(root, manifest, _):
+                p = root / manifest['cases'][index]['inputPath']; p.write_text(p.read_text().replace(old, new))
+            return mutate
+        self.control('NC-04', 'content-msb-sign', 'ORACLE', text_mutation(5, '+125,000', '-125,000'))
+        self.control('NC-04', 'content-mb-missing-restored', 'ORACLE', text_mutation(12, '| +VND', '| +25,000VND'))
+        self.control('NC-04', 'content-mb-title', 'ORACLE', text_mutation(13, '# title: MB Bank - Xác thực giao dịch', '# title: SYNTHETIC_WRONG_TITLE'))
+        def marketing_tx(root, manifest, _):
+            dump(root / manifest['cases'][4]['expectedPath'], {'parse': True, 'direction': 'IN', 'amount': 30000, 'balanceAfter': 875000, 'description': 'SYNTHETIC_MEMO_A'})
+        self.control('NC-04', 'marketing-not-transaction', 'ORACLE', marketing_tx)
+        def otp_sent(root, manifest, _):
+            p = root / manifest['cases'][13]['inputPath']; p.write_text(p.read_text() + 'SYNTHETIC_SENTINEL: 12345678')
+        self.control('NC-07', 'mb-digital-otp-no-digits', 'PRIVACY', otp_sent)
+
     def test_nc01_pairing(self):
         self.control('NC-01', 'missing-pair', 'INVENTORY', lambda r, m, s: (r / m['cases'][0]['expectedPath']).unlink())
         self.control('NC-01', 'extra-pair', 'INVENTORY', lambda r, m, s: (r / 'extra.txt').write_text('SYNTHETIC_EXTRA'))

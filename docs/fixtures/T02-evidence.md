@@ -35,6 +35,31 @@ Packager hiện trích chính xác identity từ source snapshot đã lấy bằ
 
 Test bổ sung nằm trong file selftest Dev đã được phép: hồi quy 20 tests tại baseline và 22 tests T02, 13 mutation âm tính, cùng probe tạm cho Android testDebug hợp nhất với test base; không sửa source/test thật để làm probe. Các ca kiểm này xuất `build/reports/t02/packager-negative-controls.json`. Local đã đối chiếu thêm 13 XML thật của CI trước: 22/22 identity khớp, không failure/error/skip. CI mới phải chạy đầy đủ để xác nhận đóng gói/C07; trước khi có kết quả thì vẫn NOT VERIFIED. Nguồn synthetic và 15 signoff vẫn PENDING, T02-REAL-CORPUS vẫn BLOCKED. Tất cả bình luận bàn giao mới trên GitHub dùng tiếng Việt theo yêu cầu PO.
 
+## CONTENT PLAN — lượt chỉnh nội dung hợp nhất ngày 22/10/2026
+
+Theo quyết định Leader tại Issue #14, bình luận 6335484558; tham chiếu các bổ sung UX PO trước đó. Đây là **PO_UX_REFERENCE_UNVERIFIED**: lời mô tả UX do PO cung cấp, không phải metadata/notification thu trực tiếp trên Android, không nâng provenance hay layout verification.
+
+| Nhóm | Xử lý trong lượt này |
+| --- | --- |
+| BIDV IN/OUT | Đã khớp bốn nhãn; giữ nguyên byte cả input và expected |
+| BIDV marketing | Title chương trình giả lập có emoji; body ưu đãi QR Pay/BIDV SmartBanking giả lập, parse=false |
+| BIDV missing/notice | Giữ nguyên synthetic contract, byte không đổi |
+| MSB IN | Chuyển sang bốn dòng: số tiền có dấu, tài khoản XXX, So du, Noi dung; giá trị synthetic cũ vẫn khớp expected |
+| MSB OUT | Đã khớp bốn dòng; giữ nguyên byte, không đổi tiền/số dư/memo để tạo diff không cần thiết |
+| MSB missing/notice/promotion | Giữ nguyên byte, synthetic contract |
+| MB IN/OUT | Title biến động số dư; body TK XXX, dấu ±, VND, giờ/ngày giả lập, GD, SD; expected khớp amount/direction/balance/description |
+| MB missing amount | Cùng UX MB nhưng phần số tiền rỗng, parse=null và T04_MISSING_AMOUNT giữ nguyên |
+| MB Digital OTP push | Title xác thực giao dịch; body chỉ có SYNTHETIC_REQUEST_A, không mã OTP hay mã giao dịch thật; parse=false |
+| MB marketing | Title emoji/program giả lập; body ưu đãi điện/nước giả lập, parse=false |
+
+Delta dữ liệu thực tế: **7 input .txt thay đổi** (5 MB, BIDV marketing, MSB IN); 8 input .txt còn lại và **toàn bộ 15 expected JSON giữ nguyên byte** — 23/30 file dữ liệu không đổi so với HEAD c5a67c2. Mẫu MSB OUT nằm trong phạm vi rà soát nhưng đã khớp nên giữ byte theo yêu cầu tránh sửa không cần thiết. Đồng bộ đúng 7 inputSha256; provenance/approval/envelope/extras pointers trong manifest giữ nguyên. Không sửa schema, không thêm field contract, không sửa packager/JVM loader/CI hoặc file ngoài allowlist 42.
+
+Validator chỉ thêm kiểm nội dung corpus test: 6 giao dịch parse=true với sign/amount/balance/memo khớp layout đã duyệt; 6 noise parse=false; 3 missing parse=null/T04_MISSING_AMOUNT; title/body qua txtTitle/txtBody phải đúng ngữ cảnh MB/marketing. Đây không phải engine/parser production hoặc xác minh format bank thật. Kiểm privacy trước content invariants để sentinel vẫn bị từ chối bởi đúng rule privacy. Negative controls bổ sung cho sai amount/balance/memo/sign/title, missing bị điền lại tiền, marketing bị gán transaction và OTP push chứa sentinel số; tất cả mutation chỉ trên bản sao tạm, manifest hash được cập nhật để không thể chỉ dựa vào hash stale.
+
+Local sau lượt content: validator/C09 PASS; **22 Python selftests PASS**, 60 subcase NC fixture; 16 ca packager regression giữ nguyên. Report fixture-validation.json bổ sung contentCounts và contentInventory cho 15 mẫu. Các số CI/JUnit/C07/C09/APK và artifact digests tại HEAD mới được bàn giao trên Issue #14 sau khi chạy thật, không lấy kết quả HEAD c5a67c2 thay thế.
+
+15/15 PO/QA privacy signoff vẫn PENDING, acceptedCorpus=false. Ba seed null, 18 scenario UNRESOLVED, large numeric stress và T02-REAL-CORPUS giữ BLOCKED theo quyết định cũ. PR #15 Draft; Developer → QA độc lập (không sửa code) → Leader → PO; không Ready/merge/tag/release.
+
 ## Governance and handover
 
 Full HEAD, PR/run links, job/artifact IDs/digests and final outcomes will be recorded on Issue #14 and the Draft PR at the exact built SHA after CI. Developer does not write QA verdict or PO signoff. PO should review all 15 safe seeds and the per-case provenance/expected matrix before authorizing accepted status; statuses stay PENDING until evidence exists. T02-REAL-CORPUS BLOCKED, T01 OPEN, B2 API37 ENV-FAIL and B3 PENDING PO DEVICE unchanged. No production parser/dedup/DB/capture, qa/, Approved DOCX, version, dependencies, permissions or release settings changed.
