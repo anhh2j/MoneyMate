@@ -1,0 +1,4 @@
+# package: com.example.moneymate.fixture.msb
+# title: SYNTHETIC_MSB
+---
+SYNTHETIC_NOTICE_A

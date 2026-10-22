@@ -1,0 +1,4 @@
+# package: com.example.moneymate.fixture.mb
+# title: SYNTHETIC_MB
+---
+SYNTHETIC_PROMOTION_A

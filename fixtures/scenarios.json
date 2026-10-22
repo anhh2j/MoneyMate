@@ -1,0 +1,1646 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "bidv_FX-01",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "repeat",
+      "parameters": {
+        "count": 2
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-01"
+      ],
+      "facts": [
+        "Identical delivery occurrences remain distinct test inputs"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-02",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_BALANCE_NOT_AMOUNT"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-02"
+      ],
+      "facts": [
+        "Transaction amount and balance remain independent"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-03",
+      "seedIds": [
+        "bidv_invalid_missing_amount_01"
+      ],
+      "operation": "omit",
+      "parameters": {
+        "field": "amount"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_03",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-03"
+      ],
+      "facts": [
+        "Missing amount has unresolved consumer policy"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-04",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "omit",
+      "parameters": {
+        "field": "balanceAfter"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-04"
+      ],
+      "facts": [
+        "Optional fields must not be invented"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-05",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_SIGN: ±"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_05",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-05"
+      ],
+      "facts": [
+        "Unobserved sign policy unresolved"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-06",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_AMOUNT: 125 000 VND"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_06",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-06"
+      ],
+      "facts": [
+        "Grouping is input data not bank-format evidence"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-07",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_AMOUNT: 0.5 VND"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_07",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-07"
+      ],
+      "facts": [
+        "Zero decimal overflow nonVND policies unresolved; large stress input blocked pending exact exception"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-08",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "unicodeNfd",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_Tiếng Việt 😀"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-08"
+      ],
+      "facts": [
+        "Preserve Unicode representation"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-09",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "lineEnding",
+      "parameters": {
+        "value": "CRLF"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-09"
+      ],
+      "facts": [
+        "Retain LF CRLF tab and whitespace bytes"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-10",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "null",
+      "parameters": {
+        "field": "title"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-10"
+      ],
+      "facts": [
+        "Keep title text bigText subText missing null empty independent"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-11",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "bigText",
+        "value": "SYNTHETIC_FULL_TEXT"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_11",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-11"
+      ],
+      "facts": [
+        "Do not auto-merge conflicting text and bigText"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-12",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "truncate",
+      "parameters": {
+        "codePoints": 3
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-12"
+      ],
+      "facts": [
+        "Do not split a Unicode code point; preserve truncation facts"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-13",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "update",
+      "parameters": {
+        "groupKey": "SYNTHETIC_GROUP_A",
+        "isGroupSummary": true
+      },
+      "consumerTask": "T06",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-13"
+      ],
+      "facts": [
+        "Summary and child are separate observations"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-14",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "repeat",
+      "parameters": {
+        "count": 2
+      },
+      "consumerTask": "T06",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-14"
+      ],
+      "facts": [
+        "Same notification ID and payload repeated"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-15",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "update",
+      "parameters": {
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "value": "SYNTHETIC_UPDATED"
+      },
+      "consumerTask": "T06",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-15"
+      ],
+      "facts": [
+        "Same ID with changed payload is an update fact"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-16",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "update",
+      "parameters": {
+        "notificationId": "SYNTHETIC_EVENT_B"
+      },
+      "consumerTask": "T06",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-16"
+      ],
+      "facts": [
+        "Different business event may share amount"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-17",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "refCode",
+        "value": "SYNTHETIC_REF_A"
+      },
+      "consumerTask": "T06",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-17"
+      ],
+      "facts": [
+        "Ref equality and conflicts require later dedup policy"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-18",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "deltaTime",
+      "parameters": {
+        "values": [
+          119000,
+          120000,
+          121000
+        ]
+      },
+      "consumerTask": "T06",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_18",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-18"
+      ],
+      "facts": [
+        "Boundary and cross-bucket inputs; no merge verdict"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-19",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_OTP_LIKE [REMOVED]"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-19"
+      ],
+      "facts": [
+        "Noise has no authentication code"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-20",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "update",
+      "parameters": {
+        "packageName": "com.example.moneymate.fixture.unknown"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-20"
+      ],
+      "facts": [
+        "Unsupported source must not become a trusted bank"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-21",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "update",
+      "parameters": {
+        "consent": "DENIED",
+        "expectedDelivery": "METADATA_ONLY"
+      },
+      "consumerTask": "T01_T07",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-21"
+      ],
+      "facts": [
+        "No payload reference in denied expected delivery"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-22",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "deltaTime",
+      "parameters": {
+        "values": [
+          0,
+          1000
+        ]
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-22"
+      ],
+      "facts": [
+        "Post time and received time are distinct"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-23",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "repeat",
+      "parameters": {
+        "count": 3,
+        "codePoints": 100000
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-23"
+      ],
+      "facts": [
+        "Bounded inert stress description; executor and timing deferred"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "bidv_FX-24",
+      "seedIds": [
+        "bidv_txn_out_01"
+      ],
+      "operation": "empty",
+      "parameters": {
+        "field": "text"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-24"
+      ],
+      "facts": [
+        "Malformed cases are covered by negative controls"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-01",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "repeat",
+      "parameters": {
+        "count": 2
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-01"
+      ],
+      "facts": [
+        "Identical delivery occurrences remain distinct test inputs"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-02",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_BALANCE_NOT_AMOUNT"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-02"
+      ],
+      "facts": [
+        "Transaction amount and balance remain independent"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-03",
+      "seedIds": [
+        "msb_invalid_missing_amount_01"
+      ],
+      "operation": "omit",
+      "parameters": {
+        "field": "amount"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_03",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-03"
+      ],
+      "facts": [
+        "Missing amount has unresolved consumer policy"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-04",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "omit",
+      "parameters": {
+        "field": "balanceAfter"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-04"
+      ],
+      "facts": [
+        "Optional fields must not be invented"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-05",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_SIGN: ±"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_05",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-05"
+      ],
+      "facts": [
+        "Unobserved sign policy unresolved"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-06",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_AMOUNT: 125 000 VND"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_06",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-06"
+      ],
+      "facts": [
+        "Grouping is input data not bank-format evidence"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-07",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_AMOUNT: 0.5 VND"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_07",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-07"
+      ],
+      "facts": [
+        "Zero decimal overflow nonVND policies unresolved; large stress input blocked pending exact exception"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-08",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "unicodeNfd",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_Tiếng Việt 😀"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-08"
+      ],
+      "facts": [
+        "Preserve Unicode representation"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-09",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "lineEnding",
+      "parameters": {
+        "value": "CRLF"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-09"
+      ],
+      "facts": [
+        "Retain LF CRLF tab and whitespace bytes"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-10",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "null",
+      "parameters": {
+        "field": "title"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-10"
+      ],
+      "facts": [
+        "Keep title text bigText subText missing null empty independent"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-11",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "bigText",
+        "value": "SYNTHETIC_FULL_TEXT"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_11",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-11"
+      ],
+      "facts": [
+        "Do not auto-merge conflicting text and bigText"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-12",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "truncate",
+      "parameters": {
+        "codePoints": 3
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-12"
+      ],
+      "facts": [
+        "Do not split a Unicode code point; preserve truncation facts"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-13",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "update",
+      "parameters": {
+        "groupKey": "SYNTHETIC_GROUP_A",
+        "isGroupSummary": true
+      },
+      "consumerTask": "T06",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-13"
+      ],
+      "facts": [
+        "Summary and child are separate observations"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-14",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "repeat",
+      "parameters": {
+        "count": 2
+      },
+      "consumerTask": "T06",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-14"
+      ],
+      "facts": [
+        "Same notification ID and payload repeated"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-15",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "update",
+      "parameters": {
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "value": "SYNTHETIC_UPDATED"
+      },
+      "consumerTask": "T06",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-15"
+      ],
+      "facts": [
+        "Same ID with changed payload is an update fact"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-16",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "update",
+      "parameters": {
+        "notificationId": "SYNTHETIC_EVENT_B"
+      },
+      "consumerTask": "T06",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-16"
+      ],
+      "facts": [
+        "Different business event may share amount"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-17",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "refCode",
+        "value": "SYNTHETIC_REF_A"
+      },
+      "consumerTask": "T06",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-17"
+      ],
+      "facts": [
+        "Ref equality and conflicts require later dedup policy"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-18",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "deltaTime",
+      "parameters": {
+        "values": [
+          119000,
+          120000,
+          121000
+        ]
+      },
+      "consumerTask": "T06",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_18",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-18"
+      ],
+      "facts": [
+        "Boundary and cross-bucket inputs; no merge verdict"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-19",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_OTP_LIKE [REMOVED]"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-19"
+      ],
+      "facts": [
+        "Noise has no authentication code"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-20",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "update",
+      "parameters": {
+        "packageName": "com.example.moneymate.fixture.unknown"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-20"
+      ],
+      "facts": [
+        "Unsupported source must not become a trusted bank"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-21",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "update",
+      "parameters": {
+        "consent": "DENIED",
+        "expectedDelivery": "METADATA_ONLY"
+      },
+      "consumerTask": "T01_T07",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-21"
+      ],
+      "facts": [
+        "No payload reference in denied expected delivery"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-22",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "deltaTime",
+      "parameters": {
+        "values": [
+          0,
+          1000
+        ]
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-22"
+      ],
+      "facts": [
+        "Post time and received time are distinct"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-23",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "repeat",
+      "parameters": {
+        "count": 3,
+        "codePoints": 100000
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-23"
+      ],
+      "facts": [
+        "Bounded inert stress description; executor and timing deferred"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "msb_FX-24",
+      "seedIds": [
+        "msb_txn_out_01"
+      ],
+      "operation": "empty",
+      "parameters": {
+        "field": "text"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-24"
+      ],
+      "facts": [
+        "Malformed cases are covered by negative controls"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-01",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "repeat",
+      "parameters": {
+        "count": 2
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-01"
+      ],
+      "facts": [
+        "Identical delivery occurrences remain distinct test inputs"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-02",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_BALANCE_NOT_AMOUNT"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-02"
+      ],
+      "facts": [
+        "Transaction amount and balance remain independent"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-03",
+      "seedIds": [
+        "mb_invalid_missing_amount_01"
+      ],
+      "operation": "omit",
+      "parameters": {
+        "field": "amount"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_03",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-03"
+      ],
+      "facts": [
+        "Missing amount has unresolved consumer policy"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-04",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "omit",
+      "parameters": {
+        "field": "balanceAfter"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-04"
+      ],
+      "facts": [
+        "Optional fields must not be invented"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-05",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_SIGN: ±"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_05",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-05"
+      ],
+      "facts": [
+        "Unobserved sign policy unresolved"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-06",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_AMOUNT: 125 000 VND"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_06",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-06"
+      ],
+      "facts": [
+        "Grouping is input data not bank-format evidence"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-07",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_AMOUNT: 0.5 VND"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_07",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-07"
+      ],
+      "facts": [
+        "Zero decimal overflow nonVND policies unresolved; large stress input blocked pending exact exception"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-08",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "unicodeNfd",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_Tiếng Việt 😀"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-08"
+      ],
+      "facts": [
+        "Preserve Unicode representation"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-09",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "lineEnding",
+      "parameters": {
+        "value": "CRLF"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-09"
+      ],
+      "facts": [
+        "Retain LF CRLF tab and whitespace bytes"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-10",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "null",
+      "parameters": {
+        "field": "title"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-10"
+      ],
+      "facts": [
+        "Keep title text bigText subText missing null empty independent"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-11",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "bigText",
+        "value": "SYNTHETIC_FULL_TEXT"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_11",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-11"
+      ],
+      "facts": [
+        "Do not auto-merge conflicting text and bigText"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-12",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "truncate",
+      "parameters": {
+        "codePoints": 3
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-12"
+      ],
+      "facts": [
+        "Do not split a Unicode code point; preserve truncation facts"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-13",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "update",
+      "parameters": {
+        "groupKey": "SYNTHETIC_GROUP_A",
+        "isGroupSummary": true
+      },
+      "consumerTask": "T06",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-13"
+      ],
+      "facts": [
+        "Summary and child are separate observations"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-14",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "repeat",
+      "parameters": {
+        "count": 2
+      },
+      "consumerTask": "T06",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-14"
+      ],
+      "facts": [
+        "Same notification ID and payload repeated"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-15",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "update",
+      "parameters": {
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "value": "SYNTHETIC_UPDATED"
+      },
+      "consumerTask": "T06",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-15"
+      ],
+      "facts": [
+        "Same ID with changed payload is an update fact"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-16",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "update",
+      "parameters": {
+        "notificationId": "SYNTHETIC_EVENT_B"
+      },
+      "consumerTask": "T06",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-16"
+      ],
+      "facts": [
+        "Different business event may share amount"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-17",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "refCode",
+        "value": "SYNTHETIC_REF_A"
+      },
+      "consumerTask": "T06",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-17"
+      ],
+      "facts": [
+        "Ref equality and conflicts require later dedup policy"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-18",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "deltaTime",
+      "parameters": {
+        "values": [
+          119000,
+          120000,
+          121000
+        ]
+      },
+      "consumerTask": "T06",
+      "oracleMode": "UNRESOLVED",
+      "decisionId": "T04_FX_18",
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-18"
+      ],
+      "facts": [
+        "Boundary and cross-bucket inputs; no merge verdict"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-19",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "substitute",
+      "parameters": {
+        "field": "text",
+        "value": "SYNTHETIC_OTP_LIKE [REMOVED]"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-19"
+      ],
+      "facts": [
+        "Noise has no authentication code"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-20",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "update",
+      "parameters": {
+        "packageName": "com.example.moneymate.fixture.unknown"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-20"
+      ],
+      "facts": [
+        "Unsupported source must not become a trusted bank"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-21",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "update",
+      "parameters": {
+        "consent": "DENIED",
+        "expectedDelivery": "METADATA_ONLY"
+      },
+      "consumerTask": "T01_T07",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-21"
+      ],
+      "facts": [
+        "No payload reference in denied expected delivery"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-22",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "deltaTime",
+      "parameters": {
+        "values": [
+          0,
+          1000
+        ]
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-22"
+      ],
+      "facts": [
+        "Post time and received time are distinct"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-23",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "repeat",
+      "parameters": {
+        "count": 3,
+        "codePoints": 100000
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-23"
+      ],
+      "facts": [
+        "Bounded inert stress description; executor and timing deferred"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    },
+    {
+      "id": "mb_FX-24",
+      "seedIds": [
+        "mb_txn_out_01"
+      ],
+      "operation": "empty",
+      "parameters": {
+        "field": "text"
+      },
+      "consumerTask": "T04_T05",
+      "oracleMode": "CONTRACT",
+      "decisionId": null,
+      "eligibleForRealBankGolden": false,
+      "provenanceKind": "synthetic_contract",
+      "coverageTags": [
+        "FX-24"
+      ],
+      "facts": [
+        "Malformed cases are covered by negative controls"
+      ],
+      "token": "SYNTHETIC_SCENARIO"
+    }
+  ]
+}

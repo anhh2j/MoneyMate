@@ -1,0 +1,817 @@
+{
+  "schemaVersion": 1,
+  "corpusClass": "SYNTHETIC_CONTRACT",
+  "cases": [
+    {
+      "id": "bidv_txn_in_01",
+      "bankCode": "BIDV",
+      "caseType": "txn_in_01",
+      "inputPath": "bidv/txn_in_01.txt",
+      "expectedPath": "bidv/txn_in_01.expected.json",
+      "inputSha256": "d7d2:e1db:bd07:c6a6:e024:8561:f436:8c8a:d572:683e:3da9:9165:899e:ff4c:8773:da46",
+      "expectedSha256": "7721:ffd2:7493:1e6d:83de:edf1:105e:ef7f:276c:f11c:a8f8:3170:52c9:7713:2bab:9cdf",
+      "provenance": {
+        "kind": "synthetic_from_observed_structure",
+        "sourceRef": "PO_BIDV_STRUCTURE",
+        "variant": "txn_in_01",
+        "rationale": "SYNTHETIC_VALUES_ONLY"
+      },
+      "formatVerification": "STRUCTURE_ONLY",
+      "eligibleForRealBankGolden": false,
+      "observedPackage": null,
+      "layoutVerification": "UNKNOWN",
+      "envelope": {
+        "source": "NOTIF",
+        "packageName": "com.example.moneymate.fixture.bidv",
+        "postTime": "2000-01-01T00:00:00+07:00",
+        "receivedAt": "2000-01-01T00:00:01+07:00",
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "groupKey": null,
+        "isGroupSummary": false
+      },
+      "extras": {
+        "title": {
+          "state": "string",
+          "source": "txtTitle"
+        },
+        "text": {
+          "state": "string",
+          "source": "txtBody"
+        },
+        "bigText": {
+          "state": "missing"
+        },
+        "subText": {
+          "state": "null"
+        }
+      },
+      "oracleScope": "CONTRACT_ONLY",
+      "coverageTags": [
+        "FX-01",
+        "FX-02"
+      ],
+      "approval": {
+        "poPrivacy": "PENDING",
+        "qaPrivacy": "PENDING",
+        "evidenceRef": null
+      }
+    },
+    {
+      "id": "bidv_txn_out_01",
+      "bankCode": "BIDV",
+      "caseType": "txn_out_01",
+      "inputPath": "bidv/txn_out_01.txt",
+      "expectedPath": "bidv/txn_out_01.expected.json",
+      "inputSha256": "451c:2200:385a:7541:fff0:a0df:c59e:1176:b5fc:1d0a:6f8c:b23d:5dd9:1ced:ec84:380d",
+      "expectedSha256": "a7be:11dc:6170:8f93:08a5:8596:c678:4119:6f55:e361:4900:b505:3cc3:f13e:b5a3:70bc",
+      "provenance": {
+        "kind": "synthetic_from_observed_structure",
+        "sourceRef": "PO_BIDV_STRUCTURE",
+        "variant": "txn_out_01",
+        "rationale": "SYNTHETIC_VALUES_ONLY"
+      },
+      "formatVerification": "STRUCTURE_ONLY",
+      "eligibleForRealBankGolden": false,
+      "observedPackage": null,
+      "layoutVerification": "UNKNOWN",
+      "envelope": {
+        "source": "NOTIF",
+        "packageName": "com.example.moneymate.fixture.bidv",
+        "postTime": "2000-01-01T00:00:00+07:00",
+        "receivedAt": "2000-01-01T00:00:01+07:00",
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "groupKey": null,
+        "isGroupSummary": false
+      },
+      "extras": {
+        "title": {
+          "state": "string",
+          "source": "txtTitle"
+        },
+        "text": {
+          "state": "string",
+          "source": "txtBody"
+        },
+        "bigText": {
+          "state": "missing"
+        },
+        "subText": {
+          "state": "null"
+        }
+      },
+      "oracleScope": "CONTRACT_ONLY",
+      "coverageTags": [
+        "FX-01",
+        "FX-02"
+      ],
+      "approval": {
+        "poPrivacy": "PENDING",
+        "qaPrivacy": "PENDING",
+        "evidenceRef": null
+      }
+    },
+    {
+      "id": "bidv_invalid_missing_amount_01",
+      "bankCode": "BIDV",
+      "caseType": "invalid_missing_amount_01",
+      "inputPath": "bidv/invalid_missing_amount_01.txt",
+      "expectedPath": "bidv/invalid_missing_amount_01.expected.json",
+      "inputSha256": "4003:3a52:ce1b:8094:c8a9:49e7:3e57:3888:b114:fdce:1539:9ca3:df55:8ca7:c972:7d24",
+      "expectedSha256": "07a2:187e:8b8c:00f7:99fb:27c8:38cd:63be:b1ea:b25b:1778:0277:95bb:337d:1895:fb9f",
+      "provenance": {
+        "kind": "synthetic_contract",
+        "sourceRef": "CONTRACT_ONLY",
+        "variant": "invalid_missing_amount_01",
+        "rationale": "SYNTHETIC_VALUES_ONLY"
+      },
+      "formatVerification": "UNVERIFIED",
+      "eligibleForRealBankGolden": false,
+      "observedPackage": null,
+      "layoutVerification": "UNKNOWN",
+      "envelope": {
+        "source": "NOTIF",
+        "packageName": "com.example.moneymate.fixture.bidv",
+        "postTime": "2000-01-01T00:00:00+07:00",
+        "receivedAt": "2000-01-01T00:00:01+07:00",
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "groupKey": null,
+        "isGroupSummary": false
+      },
+      "extras": {
+        "title": {
+          "state": "string",
+          "source": "txtTitle"
+        },
+        "text": {
+          "state": "string",
+          "source": "txtBody"
+        },
+        "bigText": {
+          "state": "missing"
+        },
+        "subText": {
+          "state": "null"
+        }
+      },
+      "oracleScope": "CONTRACT_ONLY",
+      "coverageTags": [
+        "FX-03",
+        "FX-02"
+      ],
+      "approval": {
+        "poPrivacy": "PENDING",
+        "qaPrivacy": "PENDING",
+        "evidenceRef": null
+      }
+    },
+    {
+      "id": "bidv_noise_notice_01",
+      "bankCode": "BIDV",
+      "caseType": "noise_notice_01",
+      "inputPath": "bidv/noise_notice_01.txt",
+      "expectedPath": "bidv/noise_notice_01.expected.json",
+      "inputSha256": "a2a2:abbd:4e6f:22dd:7057:41b7:d968:7203:0a67:6988:51a0:e827:4d12:fe30:3815:13c4",
+      "expectedSha256": "3f30:c2ab:ac24:eb97:79ee:be3b:1476:e830:f8f2:eec6:9672:fda9:344b:a9e4:2ff6:26be",
+      "provenance": {
+        "kind": "synthetic_contract",
+        "sourceRef": "CONTRACT_ONLY",
+        "variant": "noise_notice_01",
+        "rationale": "SYNTHETIC_VALUES_ONLY"
+      },
+      "formatVerification": "UNVERIFIED",
+      "eligibleForRealBankGolden": false,
+      "observedPackage": null,
+      "layoutVerification": "UNKNOWN",
+      "envelope": {
+        "source": "NOTIF",
+        "packageName": "com.example.moneymate.fixture.bidv",
+        "postTime": "2000-01-01T00:00:00+07:00",
+        "receivedAt": "2000-01-01T00:00:01+07:00",
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "groupKey": null,
+        "isGroupSummary": false
+      },
+      "extras": {
+        "title": {
+          "state": "string",
+          "source": "txtTitle"
+        },
+        "text": {
+          "state": "string",
+          "source": "txtBody"
+        },
+        "bigText": {
+          "state": "missing"
+        },
+        "subText": {
+          "state": "null"
+        }
+      },
+      "oracleScope": "CONTRACT_ONLY",
+      "coverageTags": [
+        "FX-19",
+        "FX-02"
+      ],
+      "approval": {
+        "poPrivacy": "PENDING",
+        "qaPrivacy": "PENDING",
+        "evidenceRef": null
+      }
+    },
+    {
+      "id": "bidv_noise_promotion_01",
+      "bankCode": "BIDV",
+      "caseType": "noise_promotion_01",
+      "inputPath": "bidv/noise_promotion_01.txt",
+      "expectedPath": "bidv/noise_promotion_01.expected.json",
+      "inputSha256": "a7c6:620c:a2a0:db0e:b6c2:61d8:da34:00ab:85fa:f91c:e098:90bc:91cb:0f48:82e6:c67f",
+      "expectedSha256": "3f30:c2ab:ac24:eb97:79ee:be3b:1476:e830:f8f2:eec6:9672:fda9:344b:a9e4:2ff6:26be",
+      "provenance": {
+        "kind": "synthetic_contract",
+        "sourceRef": "CONTRACT_ONLY",
+        "variant": "noise_promotion_01",
+        "rationale": "SYNTHETIC_VALUES_ONLY"
+      },
+      "formatVerification": "UNVERIFIED",
+      "eligibleForRealBankGolden": false,
+      "observedPackage": null,
+      "layoutVerification": "UNKNOWN",
+      "envelope": {
+        "source": "NOTIF",
+        "packageName": "com.example.moneymate.fixture.bidv",
+        "postTime": "2000-01-01T00:00:00+07:00",
+        "receivedAt": "2000-01-01T00:00:01+07:00",
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "groupKey": null,
+        "isGroupSummary": false
+      },
+      "extras": {
+        "title": {
+          "state": "string",
+          "source": "txtTitle"
+        },
+        "text": {
+          "state": "string",
+          "source": "txtBody"
+        },
+        "bigText": {
+          "state": "missing"
+        },
+        "subText": {
+          "state": "null"
+        }
+      },
+      "oracleScope": "CONTRACT_ONLY",
+      "coverageTags": [
+        "FX-19",
+        "FX-02"
+      ],
+      "approval": {
+        "poPrivacy": "PENDING",
+        "qaPrivacy": "PENDING",
+        "evidenceRef": null
+      }
+    },
+    {
+      "id": "msb_txn_in_01",
+      "bankCode": "MSB",
+      "caseType": "txn_in_01",
+      "inputPath": "msb/txn_in_01.txt",
+      "expectedPath": "msb/txn_in_01.expected.json",
+      "inputSha256": "cf08:3988:5305:3987:171e:c309:a382:ae0f:c0fc:7381:78c9:7c40:5e30:303a:32cd:05e6",
+      "expectedSha256": "7721:ffd2:7493:1e6d:83de:edf1:105e:ef7f:276c:f11c:a8f8:3170:52c9:7713:2bab:9cdf",
+      "provenance": {
+        "kind": "synthetic_contract",
+        "sourceRef": "CONTRACT_ONLY",
+        "variant": "txn_in_01",
+        "rationale": "SYNTHETIC_VALUES_ONLY"
+      },
+      "formatVerification": "UNVERIFIED",
+      "eligibleForRealBankGolden": false,
+      "observedPackage": null,
+      "layoutVerification": "UNKNOWN",
+      "envelope": {
+        "source": "NOTIF",
+        "packageName": "com.example.moneymate.fixture.msb",
+        "postTime": "2000-01-01T00:00:00+07:00",
+        "receivedAt": "2000-01-01T00:00:01+07:00",
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "groupKey": null,
+        "isGroupSummary": false
+      },
+      "extras": {
+        "title": {
+          "state": "string",
+          "source": "txtTitle"
+        },
+        "text": {
+          "state": "string",
+          "source": "txtBody"
+        },
+        "bigText": {
+          "state": "missing"
+        },
+        "subText": {
+          "state": "null"
+        }
+      },
+      "oracleScope": "CONTRACT_ONLY",
+      "coverageTags": [
+        "FX-01",
+        "FX-02"
+      ],
+      "approval": {
+        "poPrivacy": "PENDING",
+        "qaPrivacy": "PENDING",
+        "evidenceRef": null
+      }
+    },
+    {
+      "id": "msb_txn_out_01",
+      "bankCode": "MSB",
+      "caseType": "txn_out_01",
+      "inputPath": "msb/txn_out_01.txt",
+      "expectedPath": "msb/txn_out_01.expected.json",
+      "inputSha256": "d1be:2005:d305:a529:d825:5846:756b:572f:88e0:6f6e:4fef:8951:c2dd:8c66:89ac:99ee",
+      "expectedSha256": "a7be:11dc:6170:8f93:08a5:8596:c678:4119:6f55:e361:4900:b505:3cc3:f13e:b5a3:70bc",
+      "provenance": {
+        "kind": "synthetic_from_observed_structure",
+        "sourceRef": "SPEC_5_2",
+        "variant": "txn_out_01",
+        "rationale": "SYNTHETIC_VALUES_ONLY"
+      },
+      "formatVerification": "STRUCTURE_ONLY",
+      "eligibleForRealBankGolden": false,
+      "observedPackage": null,
+      "layoutVerification": "UNKNOWN",
+      "envelope": {
+        "source": "NOTIF",
+        "packageName": "com.example.moneymate.fixture.msb",
+        "postTime": "2000-01-01T00:00:00+07:00",
+        "receivedAt": "2000-01-01T00:00:01+07:00",
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "groupKey": null,
+        "isGroupSummary": false
+      },
+      "extras": {
+        "title": {
+          "state": "string",
+          "source": "txtTitle"
+        },
+        "text": {
+          "state": "string",
+          "source": "txtBody"
+        },
+        "bigText": {
+          "state": "missing"
+        },
+        "subText": {
+          "state": "null"
+        }
+      },
+      "oracleScope": "CONTRACT_ONLY",
+      "coverageTags": [
+        "FX-01",
+        "FX-02"
+      ],
+      "approval": {
+        "poPrivacy": "PENDING",
+        "qaPrivacy": "PENDING",
+        "evidenceRef": null
+      }
+    },
+    {
+      "id": "msb_invalid_missing_amount_01",
+      "bankCode": "MSB",
+      "caseType": "invalid_missing_amount_01",
+      "inputPath": "msb/invalid_missing_amount_01.txt",
+      "expectedPath": "msb/invalid_missing_amount_01.expected.json",
+      "inputSha256": "e97d:6456:53af:1172:39da:c5f1:6f2a:00e2:498e:fc15:a5a8:dfe9:c4d9:5597:08bb:d1fe",
+      "expectedSha256": "07a2:187e:8b8c:00f7:99fb:27c8:38cd:63be:b1ea:b25b:1778:0277:95bb:337d:1895:fb9f",
+      "provenance": {
+        "kind": "synthetic_contract",
+        "sourceRef": "CONTRACT_ONLY",
+        "variant": "invalid_missing_amount_01",
+        "rationale": "SYNTHETIC_VALUES_ONLY"
+      },
+      "formatVerification": "UNVERIFIED",
+      "eligibleForRealBankGolden": false,
+      "observedPackage": null,
+      "layoutVerification": "UNKNOWN",
+      "envelope": {
+        "source": "NOTIF",
+        "packageName": "com.example.moneymate.fixture.msb",
+        "postTime": "2000-01-01T00:00:00+07:00",
+        "receivedAt": "2000-01-01T00:00:01+07:00",
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "groupKey": null,
+        "isGroupSummary": false
+      },
+      "extras": {
+        "title": {
+          "state": "string",
+          "source": "txtTitle"
+        },
+        "text": {
+          "state": "string",
+          "source": "txtBody"
+        },
+        "bigText": {
+          "state": "missing"
+        },
+        "subText": {
+          "state": "null"
+        }
+      },
+      "oracleScope": "CONTRACT_ONLY",
+      "coverageTags": [
+        "FX-03",
+        "FX-02"
+      ],
+      "approval": {
+        "poPrivacy": "PENDING",
+        "qaPrivacy": "PENDING",
+        "evidenceRef": null
+      }
+    },
+    {
+      "id": "msb_noise_notice_01",
+      "bankCode": "MSB",
+      "caseType": "noise_notice_01",
+      "inputPath": "msb/noise_notice_01.txt",
+      "expectedPath": "msb/noise_notice_01.expected.json",
+      "inputSha256": "7390:a0f0:88e5:08b5:65ce:2a38:ec4e:a84c:d8f2:dc7d:635e:1613:e2e4:c6cb:1b8b:0d2a",
+      "expectedSha256": "3f30:c2ab:ac24:eb97:79ee:be3b:1476:e830:f8f2:eec6:9672:fda9:344b:a9e4:2ff6:26be",
+      "provenance": {
+        "kind": "synthetic_contract",
+        "sourceRef": "CONTRACT_ONLY",
+        "variant": "noise_notice_01",
+        "rationale": "SYNTHETIC_VALUES_ONLY"
+      },
+      "formatVerification": "UNVERIFIED",
+      "eligibleForRealBankGolden": false,
+      "observedPackage": null,
+      "layoutVerification": "UNKNOWN",
+      "envelope": {
+        "source": "NOTIF",
+        "packageName": "com.example.moneymate.fixture.msb",
+        "postTime": "2000-01-01T00:00:00+07:00",
+        "receivedAt": "2000-01-01T00:00:01+07:00",
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "groupKey": null,
+        "isGroupSummary": false
+      },
+      "extras": {
+        "title": {
+          "state": "string",
+          "source": "txtTitle"
+        },
+        "text": {
+          "state": "string",
+          "source": "txtBody"
+        },
+        "bigText": {
+          "state": "missing"
+        },
+        "subText": {
+          "state": "null"
+        }
+      },
+      "oracleScope": "CONTRACT_ONLY",
+      "coverageTags": [
+        "FX-19",
+        "FX-02"
+      ],
+      "approval": {
+        "poPrivacy": "PENDING",
+        "qaPrivacy": "PENDING",
+        "evidenceRef": null
+      }
+    },
+    {
+      "id": "msb_noise_promotion_01",
+      "bankCode": "MSB",
+      "caseType": "noise_promotion_01",
+      "inputPath": "msb/noise_promotion_01.txt",
+      "expectedPath": "msb/noise_promotion_01.expected.json",
+      "inputSha256": "e34c:9d49:10b6:a6c3:f0f1:64fb:fc32:0c04:9e98:605f:5c7a:7b97:c180:d0ce:3506:534a",
+      "expectedSha256": "3f30:c2ab:ac24:eb97:79ee:be3b:1476:e830:f8f2:eec6:9672:fda9:344b:a9e4:2ff6:26be",
+      "provenance": {
+        "kind": "synthetic_contract",
+        "sourceRef": "CONTRACT_ONLY",
+        "variant": "noise_promotion_01",
+        "rationale": "SYNTHETIC_VALUES_ONLY"
+      },
+      "formatVerification": "UNVERIFIED",
+      "eligibleForRealBankGolden": false,
+      "observedPackage": null,
+      "layoutVerification": "UNKNOWN",
+      "envelope": {
+        "source": "NOTIF",
+        "packageName": "com.example.moneymate.fixture.msb",
+        "postTime": "2000-01-01T00:00:00+07:00",
+        "receivedAt": "2000-01-01T00:00:01+07:00",
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "groupKey": null,
+        "isGroupSummary": false
+      },
+      "extras": {
+        "title": {
+          "state": "string",
+          "source": "txtTitle"
+        },
+        "text": {
+          "state": "string",
+          "source": "txtBody"
+        },
+        "bigText": {
+          "state": "missing"
+        },
+        "subText": {
+          "state": "null"
+        }
+      },
+      "oracleScope": "CONTRACT_ONLY",
+      "coverageTags": [
+        "FX-19",
+        "FX-02"
+      ],
+      "approval": {
+        "poPrivacy": "PENDING",
+        "qaPrivacy": "PENDING",
+        "evidenceRef": null
+      }
+    },
+    {
+      "id": "mb_txn_in_01",
+      "bankCode": "MB",
+      "caseType": "txn_in_01",
+      "inputPath": "mb/txn_in_01.txt",
+      "expectedPath": "mb/txn_in_01.expected.json",
+      "inputSha256": "5275:be1c:f35d:fb15:082f:37c1:a7a1:1aa0:41a9:9052:6a5b:4010:67d8:4fde:d069:2d02",
+      "expectedSha256": "7721:ffd2:7493:1e6d:83de:edf1:105e:ef7f:276c:f11c:a8f8:3170:52c9:7713:2bab:9cdf",
+      "provenance": {
+        "kind": "synthetic_contract",
+        "sourceRef": "CONTRACT_ONLY",
+        "variant": "txn_in_01",
+        "rationale": "SYNTHETIC_VALUES_ONLY"
+      },
+      "formatVerification": "UNVERIFIED",
+      "eligibleForRealBankGolden": false,
+      "observedPackage": null,
+      "layoutVerification": "UNKNOWN",
+      "envelope": {
+        "source": "NOTIF",
+        "packageName": "com.example.moneymate.fixture.mb",
+        "postTime": "2000-01-01T00:00:00+07:00",
+        "receivedAt": "2000-01-01T00:00:01+07:00",
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "groupKey": null,
+        "isGroupSummary": false
+      },
+      "extras": {
+        "title": {
+          "state": "string",
+          "source": "txtTitle"
+        },
+        "text": {
+          "state": "string",
+          "source": "txtBody"
+        },
+        "bigText": {
+          "state": "missing"
+        },
+        "subText": {
+          "state": "null"
+        }
+      },
+      "oracleScope": "CONTRACT_ONLY",
+      "coverageTags": [
+        "FX-01",
+        "FX-02"
+      ],
+      "approval": {
+        "poPrivacy": "PENDING",
+        "qaPrivacy": "PENDING",
+        "evidenceRef": null
+      }
+    },
+    {
+      "id": "mb_txn_out_01",
+      "bankCode": "MB",
+      "caseType": "txn_out_01",
+      "inputPath": "mb/txn_out_01.txt",
+      "expectedPath": "mb/txn_out_01.expected.json",
+      "inputSha256": "b24f:36e2:dd4d:c5c1:08e6:9dbf:a245:e3a5:5797:bc7b:7ad1:c557:d6cd:81ed:ba70:d6b7",
+      "expectedSha256": "a7be:11dc:6170:8f93:08a5:8596:c678:4119:6f55:e361:4900:b505:3cc3:f13e:b5a3:70bc",
+      "provenance": {
+        "kind": "synthetic_contract",
+        "sourceRef": "CONTRACT_ONLY",
+        "variant": "txn_out_01",
+        "rationale": "SYNTHETIC_VALUES_ONLY"
+      },
+      "formatVerification": "UNVERIFIED",
+      "eligibleForRealBankGolden": false,
+      "observedPackage": null,
+      "layoutVerification": "UNKNOWN",
+      "envelope": {
+        "source": "NOTIF",
+        "packageName": "com.example.moneymate.fixture.mb",
+        "postTime": "2000-01-01T00:00:00+07:00",
+        "receivedAt": "2000-01-01T00:00:01+07:00",
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "groupKey": null,
+        "isGroupSummary": false
+      },
+      "extras": {
+        "title": {
+          "state": "string",
+          "source": "txtTitle"
+        },
+        "text": {
+          "state": "string",
+          "source": "txtBody"
+        },
+        "bigText": {
+          "state": "missing"
+        },
+        "subText": {
+          "state": "null"
+        }
+      },
+      "oracleScope": "CONTRACT_ONLY",
+      "coverageTags": [
+        "FX-01",
+        "FX-02"
+      ],
+      "approval": {
+        "poPrivacy": "PENDING",
+        "qaPrivacy": "PENDING",
+        "evidenceRef": null
+      }
+    },
+    {
+      "id": "mb_invalid_missing_amount_01",
+      "bankCode": "MB",
+      "caseType": "invalid_missing_amount_01",
+      "inputPath": "mb/invalid_missing_amount_01.txt",
+      "expectedPath": "mb/invalid_missing_amount_01.expected.json",
+      "inputSha256": "2ac8:5160:5a07:6e0e:4467:7335:b61a:a366:96ae:2a3d:bab9:3e01:df36:c066:953f:5508",
+      "expectedSha256": "07a2:187e:8b8c:00f7:99fb:27c8:38cd:63be:b1ea:b25b:1778:0277:95bb:337d:1895:fb9f",
+      "provenance": {
+        "kind": "synthetic_contract",
+        "sourceRef": "CONTRACT_ONLY",
+        "variant": "invalid_missing_amount_01",
+        "rationale": "SYNTHETIC_VALUES_ONLY"
+      },
+      "formatVerification": "UNVERIFIED",
+      "eligibleForRealBankGolden": false,
+      "observedPackage": null,
+      "layoutVerification": "UNKNOWN",
+      "envelope": {
+        "source": "NOTIF",
+        "packageName": "com.example.moneymate.fixture.mb",
+        "postTime": "2000-01-01T00:00:00+07:00",
+        "receivedAt": "2000-01-01T00:00:01+07:00",
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "groupKey": null,
+        "isGroupSummary": false
+      },
+      "extras": {
+        "title": {
+          "state": "string",
+          "source": "txtTitle"
+        },
+        "text": {
+          "state": "string",
+          "source": "txtBody"
+        },
+        "bigText": {
+          "state": "missing"
+        },
+        "subText": {
+          "state": "null"
+        }
+      },
+      "oracleScope": "CONTRACT_ONLY",
+      "coverageTags": [
+        "FX-03",
+        "FX-02"
+      ],
+      "approval": {
+        "poPrivacy": "PENDING",
+        "qaPrivacy": "PENDING",
+        "evidenceRef": null
+      }
+    },
+    {
+      "id": "mb_noise_notice_01",
+      "bankCode": "MB",
+      "caseType": "noise_notice_01",
+      "inputPath": "mb/noise_notice_01.txt",
+      "expectedPath": "mb/noise_notice_01.expected.json",
+      "inputSha256": "e104:30f3:5db4:2f0e:2c0d:97eb:f300:e8e3:34ab:eaab:cdf4:ff36:55d2:06a8:86a0:e317",
+      "expectedSha256": "3f30:c2ab:ac24:eb97:79ee:be3b:1476:e830:f8f2:eec6:9672:fda9:344b:a9e4:2ff6:26be",
+      "provenance": {
+        "kind": "synthetic_contract",
+        "sourceRef": "CONTRACT_ONLY",
+        "variant": "noise_notice_01",
+        "rationale": "SYNTHETIC_VALUES_ONLY"
+      },
+      "formatVerification": "UNVERIFIED",
+      "eligibleForRealBankGolden": false,
+      "observedPackage": null,
+      "layoutVerification": "UNKNOWN",
+      "envelope": {
+        "source": "NOTIF",
+        "packageName": "com.example.moneymate.fixture.mb",
+        "postTime": "2000-01-01T00:00:00+07:00",
+        "receivedAt": "2000-01-01T00:00:01+07:00",
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "groupKey": null,
+        "isGroupSummary": false
+      },
+      "extras": {
+        "title": {
+          "state": "string",
+          "source": "txtTitle"
+        },
+        "text": {
+          "state": "string",
+          "source": "txtBody"
+        },
+        "bigText": {
+          "state": "missing"
+        },
+        "subText": {
+          "state": "null"
+        }
+      },
+      "oracleScope": "CONTRACT_ONLY",
+      "coverageTags": [
+        "FX-19",
+        "FX-02"
+      ],
+      "approval": {
+        "poPrivacy": "PENDING",
+        "qaPrivacy": "PENDING",
+        "evidenceRef": null
+      }
+    },
+    {
+      "id": "mb_noise_promotion_01",
+      "bankCode": "MB",
+      "caseType": "noise_promotion_01",
+      "inputPath": "mb/noise_promotion_01.txt",
+      "expectedPath": "mb/noise_promotion_01.expected.json",
+      "inputSha256": "d15f:ba36:91d9:fe9e:be71:ca6b:b9f5:e18d:cf06:e27d:65d0:12eb:f552:66e1:c9dc:65d7",
+      "expectedSha256": "3f30:c2ab:ac24:eb97:79ee:be3b:1476:e830:f8f2:eec6:9672:fda9:344b:a9e4:2ff6:26be",
+      "provenance": {
+        "kind": "synthetic_contract",
+        "sourceRef": "CONTRACT_ONLY",
+        "variant": "noise_promotion_01",
+        "rationale": "SYNTHETIC_VALUES_ONLY"
+      },
+      "formatVerification": "UNVERIFIED",
+      "eligibleForRealBankGolden": false,
+      "observedPackage": null,
+      "layoutVerification": "UNKNOWN",
+      "envelope": {
+        "source": "NOTIF",
+        "packageName": "com.example.moneymate.fixture.mb",
+        "postTime": "2000-01-01T00:00:00+07:00",
+        "receivedAt": "2000-01-01T00:00:01+07:00",
+        "notificationId": "SYNTHETIC_EVENT_A",
+        "groupKey": null,
+        "isGroupSummary": false
+      },
+      "extras": {
+        "title": {
+          "state": "string",
+          "source": "txtTitle"
+        },
+        "text": {
+          "state": "string",
+          "source": "txtBody"
+        },
+        "bigText": {
+          "state": "missing"
+        },
+        "subText": {
+          "state": "null"
+        }
+      },
+      "oracleScope": "CONTRACT_ONLY",
+      "coverageTags": [
+        "FX-19",
+        "FX-02"
+      ],
+      "approval": {
+        "poPrivacy": "PENDING",
+        "qaPrivacy": "PENDING",
+        "evidenceRef": null
+      }
+    }
+  ],
+  "privacyExceptions": []
+}
