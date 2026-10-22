@@ -1,0 +1,83 @@
+name: T20 B2 test-only runtime spike
+
+on:
+  push:
+    branches: [spike/T20-B2-argon2kt-compat]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: b2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime:
+    name: B2 API${{ matrix.api }} x86_64
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [26, 29, 33, 35]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          cmdline-tools-version: 13114758
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
+        with:
+          validate-wrappers: true
+      - name: Record identity and SDK availability
+        env:
+          B2_API: ${{ matrix.api }}
+        run: |
+          mkdir -p build/reports/b2
+          git rev-parse HEAD HEAD^{tree} > build/reports/b2/source.txt
+          java -version 2> build/reports/b2/java.txt
+          sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "platform-tools"
+          sdkmanager --list > build/reports/b2/sdk-list.txt
+          if ! grep -q "system-images;android-$B2_API;default;x86_64" build/reports/b2/sdk-list.txt; then
+            echo 'ENV-BLOCKED: requested system image unavailable' | tee build/reports/b2/environment.txt
+            exit 1
+          fi
+      - name: Build instrumented harness with strict verification
+        run: |
+          set -o pipefail
+          ./gradlew --dependency-verification strict :security:assembleDebugAndroidTest :security:dependencies --configuration debugAndroidTestRuntimeClasspath --console=plain 2>&1 | tee build/reports/b2/build-dependencies.log
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: default
+          disable-animations: true
+          script: bash security/b2-evidence/run-instrumented.sh
+      - name: Verify packaging, scope and hashes
+        run: python3 security/b2-evidence/inspect-evidence.py
+      - name: Upload actual logs even on failure
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: b2-api${{ matrix.api }}-x86_64
+          path: |
+            build/reports/b2/
+            build/reports/dependency-verification/
+            security/build/reports/
+            security/build/outputs/androidTest-results/
+            security/build/outputs/apk/androidTest/
+          if-no-files-found: error
