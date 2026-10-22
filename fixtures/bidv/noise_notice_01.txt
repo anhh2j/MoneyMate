@@ -1,0 +1,4 @@
+# package: com.example.moneymate.fixture.bidv
+# title: SYNTHETIC_BIDV
+---
+SYNTHETIC_NOTICE_A

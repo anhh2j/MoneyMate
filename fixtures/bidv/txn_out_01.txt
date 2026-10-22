@@ -1,0 +1,7 @@
+# package: com.example.moneymate.fixture.bidv
+# title: SYNTHETIC_BIDV
+---
+Tài khoản thanh toán: XXX
+Số tiền GD: -45,000 VND
+Số dư cuối: 875,000 VND
+Nội dung giao dịch: SYNTHETIC_MEMO_A

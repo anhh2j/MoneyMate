@@ -4,6 +4,8 @@ plugins {
 }
 
 kotlin { jvmToolchain(17) }
+
+sourceSets.test { resources.srcDir(rootProject.file("fixtures")) }
 jacoco { toolVersion = libs.versions.jacoco.get() }
 
 dependencies {

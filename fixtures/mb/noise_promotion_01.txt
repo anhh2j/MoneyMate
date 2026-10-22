@@ -1,0 +1,4 @@
+# package: com.example.moneymate.fixture.mb
+# title: 🎁 SYNTHETIC_QUA_A - Ưu đãi từ MB Bank
+---
+SYNTHETIC_PROMOTION_A: voucher 20,000 VND cho thanh toán hóa đơn điện/nước trên app MB Bank. Chương trình giả lập dùng trong kiểm thử.

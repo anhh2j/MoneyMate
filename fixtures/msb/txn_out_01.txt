@@ -1,0 +1,7 @@
+# package: com.example.moneymate.fixture.msb
+# title: SYNTHETIC_MSB
+---
+-45,000 VND
+tài khoản: XXX
+So du: 875,000 VND
+Noi dung: SYNTHETIC_MEMO_A

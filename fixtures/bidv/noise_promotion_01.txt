@@ -1,0 +1,4 @@
+# package: com.example.moneymate.fixture.bidv
+# title: 🎁 SYNTHETIC_QR_A - Ưu đãi BIDV SmartBanking
+---
+Chương trình SYNTHETIC_OFFER_A: giảm 30,000 VND khi thanh toán hóa đơn bằng QR Pay trên BIDV SmartBanking. Ưu đãi giả lập SYNTHETIC_PROMO_A.

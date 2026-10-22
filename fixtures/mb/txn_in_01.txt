@@ -1,0 +1,4 @@
+# package: com.example.moneymate.fixture.mb
+# title: MB Bank - Biến động số dư
+---
+TK XXX | +125,000VND lúc 00:00 01/01/2000. GD: SYNTHETIC_MEMO_A. SD: 875,000VND.

@@ -148,6 +148,155 @@ def compare_graphs(tools):
     print("PASS: independent before/after graphs, exact five-GAV delta, full SBOM coverage, actual JARs and scans")
 
 
+class JunitEvidenceError(RuntimeError):
+    """Lỗi mã hóa bằng reason ID; không đưa nội dung test vào log lỗi."""
+
+
+def junit_require(condition, reason):
+    if not condition:
+        raise JunitEvidenceError(reason)
+
+
+def kotlin_code_only(text):
+    """Giữ vị trí/newline, bỏ comment và literal để không đếm annotation giả."""
+    output = list(text)
+    index = 0
+    while index < len(text):
+        start = index
+        if text.startswith('//', index):
+            end = text.find('\n', index)
+            index = len(text) if end < 0 else end
+        elif text.startswith('/*', index):
+            depth = 1
+            index += 2
+            while index < len(text) and depth:
+                if text.startswith('/*', index):
+                    depth += 1
+                    index += 2
+                elif text.startswith('*/', index):
+                    depth -= 1
+                    index += 2
+                else:
+                    index += 1
+            junit_require(depth == 0, 'SOURCE_COMMENT')
+        elif text.startswith('"""', index):
+            end = text.find('"""', index + 3)
+            junit_require(end >= 0, 'SOURCE_LITERAL')
+            index = end + 3
+        elif text[index] in ('"', "'"):
+            quote = text[index]
+            index += 1
+            while index < len(text):
+                if text[index] == '\\':
+                    index += 2
+                elif text[index] == quote:
+                    index += 1
+                    break
+                else:
+                    index += 1
+            else:
+                raise JunitEvidenceError('SOURCE_LITERAL')
+        else:
+            index += 1
+            continue
+        for pos in range(start, min(index, len(output))):
+            if output[pos] not in ('\n', '\r'):
+                output[pos] = ' '
+    return ''.join(output)
+
+
+def junit_source_inventory(source):
+    """Chỉ hỗ trợ JUnit4 thường trong các source set/task đã được pipeline chạy."""
+    source = pathlib.Path(source)
+    inventory = {}
+    for module in [*MODULES, 'build-logic']:
+        build = source / module / 'build.gradle.kts'
+        junit_require(build.is_file(), 'SOURCE_MODULE')
+        android = bool(re.search(r'libs\.plugins\.android\.(application|library)', build.read_text()))
+        task, variant = ('testDebugUnitTest', 'debugUnitTest') if android else ('test', 'jvm')
+        test_sets = {'test', 'testDebug'} if android else {'test'}
+        for path in sorted((source / module / 'src').rglob('*.kt')):
+            relative = path.relative_to(source)
+            source_set = relative.parts[2]
+            if not source_set.startswith('test'):
+                continue
+            raw = path.read_bytes()
+            code = kotlin_code_only(raw.decode('utf-8'))
+            annotations = re.findall(r'@(?:org\.junit\.)?Test\b', code)
+            if not annotations:
+                continue
+            junit_require(source_set in test_sets, 'SOURCE_SET')
+            if re.search(r'@Test\b', code):
+                junit_require(re.search(r'^\s*import\s+org\.junit\.Test\s*$', code, re.M), 'SOURCE_IMPORT')
+            junit_require(not re.search(r'@(?:Ignore|Disabled)\b|@(?:RunWith|Parameterized|TestFactory)\b', code), 'SOURCE_UNSUPPORTED')
+            packages = re.findall(r'^\s*package\s+([A-Za-z_][\w.]*)\s*$', code, re.M)
+            classes = re.findall(r'\bclass\s+([A-Za-z_]\w*)', code)
+            junit_require(len(packages) == len(classes) == 1, 'SOURCE_CLASS')
+            methods = re.findall(r'@(?:org\.junit\.)?Test\b\s*(?:\([^)]*\)\s*)?(?:(?:public|internal)\s+)?fun\s+([A-Za-z_]\w*|`[^`]+`)\s*\(', code)
+            junit_require(len(methods) == len(annotations), 'SOURCE_METHOD')
+            classname = packages[0] + '.' + classes[0]
+            for method in methods:
+                method = method.strip('`')
+                key = (module, task, variant, classname, method)
+                junit_require(key not in inventory, 'SOURCE_DUPLICATE')
+                inventory[key] = {
+                    'module': module, 'task': task, 'variant': variant,
+                    'sourceSet': source_set, 'class': classname, 'method': method,
+                    'sourcePath': relative.as_posix(), 'sourceSha256': hashlib.sha256(raw).hexdigest(),
+                }
+    junit_require(inventory, 'SOURCE_EMPTY')
+    return inventory
+
+
+def verify_junit_inventory(source, artifacts):
+    """Đối chiếu identity chính xác; không ghim tổng 20/22 hoặc dùng ngưỡng tối thiểu."""
+    artifacts = pathlib.Path(artifacts)
+    expected = junit_source_inventory(source)
+    actual = {}
+    xml_provenance = []
+    xmls = sorted(p for p in artifacts.rglob('*.xml')
+                  if p.name.startswith('TEST-') or 'test-results' in p.relative_to(artifacts).parts)
+    junit_require(xmls, 'XML_EMPTY')
+    for path in xmls:
+        parts = path.relative_to(artifacts).parts
+        junit_require(len(parts) == 5 and parts[0] in [*MODULES, 'build-logic']
+                      and parts[1:3] == ('build', 'test-results'), 'XML_LOCATION')
+        module, task = parts[0], parts[3]
+        allowed = {k[1]: k[2] for k in expected if k[0] == module}
+        junit_require(task in allowed, 'XML_VARIANT')
+        raw = path.read_bytes()
+        junit_require(b'<!DOCTYPE' not in raw and b'<!ENTITY' not in raw, 'XML_MALFORMED')
+        try:
+            suite = ET.fromstring(raw)
+        except (ET.ParseError, ValueError):
+            raise JunitEvidenceError('XML_MALFORMED') from None
+        junit_require(suite.tag == 'testsuite', 'XML_SUITE')
+        classname = suite.get('name')
+        junit_require(classname and path.name == 'TEST-' + classname + '.xml', 'XML_CLASS')
+        for field in ('tests', 'failures', 'errors', 'skipped'):
+            junit_require(re.fullmatch(r'[0-9]+', suite.get(field, '')) is not None, 'XML_COUNTS')
+        cases = list(suite.findall('testcase'))
+        junit_require(cases and len(cases) == len(list(suite.iter('testcase')))
+                      and int(suite.get('tests')) == len(cases), 'XML_COUNTS')
+        junit_require(all(int(suite.get(k)) == 0 for k in ('failures', 'errors', 'skipped')), 'XML_OUTCOME')
+        junit_require(not any(list(suite.iter(tag)) for tag in ('failure', 'error', 'skipped')), 'XML_OUTCOME')
+        for case in cases:
+            junit_require(case.get('classname') == classname and case.get('name'), 'XML_CLASS')
+            key = (module, task, allowed[task], classname, case.get('name'))
+            junit_require(key not in actual, 'XML_DUPLICATE')
+            junit_require(key in expected, 'XML_EXTRA')
+            actual[key] = path.relative_to(artifacts).as_posix()
+        xml_provenance.append({'path': path.relative_to(artifacts).as_posix(),
+                               'sha256': hashlib.sha256(raw).hexdigest(), 'module': module,
+                               'task': task, 'variant': allowed[task], 'tests': len(cases)})
+    junit_require(set(actual) == set(expected), 'XML_MISSING')
+    rows = [dict(expected[key], xmlPath=actual[key]) for key in sorted(expected)]
+    return {'tests': len(actual), 'failures': 0, 'errors': 0, 'skipped': 0}, {
+        'status': 'PASS', 'sourceTestCount': len(expected), 'actualTestCount': len(actual),
+        'inventory': rows, 'xmlProvenance': xml_provenance,
+    }
+
+
 def package_review(args):
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -194,10 +343,10 @@ def package_review(args):
             raise RuntimeError("Missing launch success")
         if not any(n.get("text") == "MoneyMate" and n.get("package") == "com.app.moneymate" for n in ET.parse(evidence / "window.xml").getroot().iter()):
             raise RuntimeError("MoneyMate not visible")
-    junit = [ET.parse(p).getroot() for p in (review / "artifacts").rglob("TEST-*.xml")]
-    totals = {key: sum(int(x.get(key, 0)) for x in junit) for key in ["tests", "failures", "errors", "skipped"]}
-    if totals != {"tests": 20, "failures": 0, "errors": 0, "skipped": 0}:
-        raise RuntimeError("Unexpected JUnit outcome")
+    totals, junit_inventory = verify_junit_inventory(source, review / "artifacts")
+    junit_inventory['head'] = head
+    junit_inventory['tree'] = head_tree
+    dump(review / "junit-inventory.json", junit_inventory)
     exits = {}
     with tempfile.TemporaryDirectory(prefix="moneymate-review-git-") as directory:
         gitdir = pathlib.Path(directory) / "refs.git"

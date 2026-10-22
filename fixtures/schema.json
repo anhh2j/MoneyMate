@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "corpusClass": "SYNTHETIC_CONTRACT",
+  "rules": [
+    "INVENTORY",
+    "STRICT_JSON",
+    "SCHEMA",
+    "ORACLE",
+    "INTEGRITY",
+    "PATH",
+    "PRIVACY",
+    "PRIVACY_NORMALIZED",
+    "EXCEPTION",
+    "PROVENANCE",
+    "SCENARIO",
+    "ENCODING",
+    "CONSENT",
+    "EVIDENCE",
+    "JUNIT",
+    "ENVELOPE",
+    "ORDER",
+    "MARKER"
+  ],
+  "sourceScopes": [
+    {
+      "bankCode": "BIDV",
+      "caseType": "txn_in_01",
+      "direction": "IN",
+      "sourceRef": "PO_BIDV_STRUCTURE"
+    },
+    {
+      "bankCode": "BIDV",
+      "caseType": "txn_out_01",
+      "direction": "OUT",
+      "sourceRef": "PO_BIDV_STRUCTURE"
+    },
+    {
+      "bankCode": "MSB",
+      "caseType": "txn_out_01",
+      "direction": "OUT",
+      "sourceRef": "SPEC_5_2"
+    }
+  ],
+  "banks": [
+    "BIDV",
+    "MSB",
+    "MB"
+  ],
+  "caseTypes": [
+    "txn_in_01",
+    "txn_out_01",
+    "invalid_missing_amount_01",
+    "noise_notice_01",
+    "noise_promotion_01"
+  ],
+  "operations": [
+    "omit",
+    "null",
+    "empty",
+    "lineEnding",
+    "unicodeNfd",
+    "substitute",
+    "truncate",
+    "repeat",
+    "update",
+    "deltaTime"
+  ],
+  "definitions": {
+    "manifest": [
+      "schemaVersion",
+      "corpusClass",
+      "cases",
+      "privacyExceptions"
+    ],
+    "case": [
+      "id",
+      "bankCode",
+      "caseType",
+      "inputPath",
+      "expectedPath",
+      "inputSha256",
+      "expectedSha256",
+      "provenance",
+      "formatVerification",
+      "eligibleForRealBankGolden",
+      "observedPackage",
+      "layoutVerification",
+      "envelope",
+      "extras",
+      "oracleScope",
+      "coverageTags",
+      "approval"
+    ],
+    "provenance": [
+      "kind",
+      "sourceRef",
+      "variant",
+      "rationale"
+    ],
+    "approval": [
+      "poPrivacy",
+      "qaPrivacy",
+      "evidenceRef"
+    ],
+    "envelope": [
+      "source",
+      "packageName",
+      "postTime",
+      "receivedAt",
+      "notificationId",
+      "groupKey",
+      "isGroupSummary"
+    ],
+    "scenario": [
+      "id",
+      "seedIds",
+      "operation",
+      "parameters",
+      "consumerTask",
+      "oracleMode",
+      "decisionId",
+      "eligibleForRealBankGolden",
+      "provenanceKind",
+      "coverageTags",
+      "facts",
+      "token"
+    ],
+    "scenarioDocument": [
+      "schemaVersion",
+      "scenarios"
+    ]
+  },
+  "limits": {
+    "maxCodePoints": 100000,
+    "maxRepeat": 3,
+    "maxDeltaMs": 121000
+  },
+  "numericExceptionFields": [
+    "amount",
+    "balanceAfter",
+    "postTime",
+    "receivedAt",
+    "value"
+  ]
+}

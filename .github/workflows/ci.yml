@@ -64,6 +64,12 @@ jobs:
           node --test scripts/tests/release_plan.test.cjs 2>&1 | tee build/reports/t00c/release-plan-tests.log
           python3 -m unittest discover -s scripts/tests -p 'test_release_*.py' -v 2>&1 | tee build/reports/t00c/release-control-tests.log
           python3 scripts/release_offline.py 2>&1 | tee build/reports/t00c/bootstrap-dry-run.log
+      - name: T02 synthetic fixture contract and negative controls
+        run: |
+          mkdir -p build/reports/t02
+          set -o pipefail
+          python3 scripts/t02_fixture_checks.py --report build/reports/t02/fixture-validation.json 2>&1 | tee build/reports/t02/fixture-validation.log
+          python3 -m unittest discover -s scripts/tests -p 'test_t02_fixture_checks.py' -v 2>&1 | tee build/reports/t02/selftests.log
       - name: Build and required checks
         run: |
           mkdir -p build/reports/dod
@@ -86,6 +92,10 @@ jobs:
         run: python3 scripts/check_negative_controls.py --tools "$RUNNER_TEMP/moneymate-tools"
       - name: Signed R8 dry-run
         run: python3 scripts/dry_run.py
+      - name: T02 test fixture isolation from debug and release APKs
+        run: |
+          set -o pipefail
+          python3 scripts/t02_fixture_checks.py --apk app/build/outputs/apk/debug/app-debug.apk --apk app/build/outputs/apk/release/app-release.apk --report build/reports/t02/apk-isolation.json 2>&1 | tee build/reports/t02/apk-isolation.log
       - name: Manifest and repository checks
         run: python3 .github/check_skeleton.py
       - name: Compare independent tooling graphs before and after B

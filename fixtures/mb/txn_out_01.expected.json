@@ -1,0 +1,9 @@
+{
+  "parse": true,
+  "direction": "OUT",
+  "amount": 45000,
+  "balanceAfter": 875000,
+  "description": "SYNTHETIC_MEMO_A",
+  "accountMask": null,
+  "refCode": null
+}
