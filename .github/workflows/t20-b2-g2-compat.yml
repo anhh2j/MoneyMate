@@ -47,7 +47,6 @@ jobs:
       G2_TARGET: ${{ matrix.target }}
       G2_RAM: ${{ matrix.ram }}
       G2_HEAP: ${{ matrix.heap }}
-      G2_TOOLS: ${{ runner.temp }}/b2-g2-tools
     steps:
       - uses: actions/checkout@v7
         with:
@@ -70,6 +69,8 @@ jobs:
           sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "platform-tools"
           python3 security/b2-evidence/b2-g2-run-and-inspect.py preflight
       - name: Strict task preflight, minified harness build and security scans
+        env:
+          G2_TOOLS: ${{ runner.temp }}/b2-g2-tools
         run: python3 security/b2-evidence/b2-g2-run-and-inspect.py build
       - name: Enable KVM
         run: |
