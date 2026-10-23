@@ -72,5 +72,5 @@ object B2KdfProbe {
 
 /** The inspector must prove this unreachable class was removed by R8. */
 internal class B2G2UnreachableCanary {
-    fun marker() = "B2_G2_CANARY_MUST_BE_REMOVED"
+    val marker = "B2_G2_CANARY_MUST_BE_REMOVED"
 }

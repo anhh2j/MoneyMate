@@ -16,6 +16,29 @@ HARNESS = ROOT / 'security/b2-g2'
 REPORT = HARNESS / 'build/reports/b2-g2'
 BASE = '690a74af29897d43fcb9f4c58808ae6ea2e3365f'
 ACCEPTED_B2 = 'be26d275d621c4a0c64ed9dd5fb89cad42bf91b2'
+# G2-P01: Leader6354820006, official PO authorization6355498984.
+APPROVED_CHECKSUMS = [
+    ("androidx.annotation:annotation:1.3.0", "annotation-1.3.0.module",
+     "9516c2ae44284ea0bd3d0eade0ee638879b708cbe31e3af92ba96c300604ebc3"),
+    ("androidx.annotation:annotation:1.6.0", "annotation-1.6.0.module",
+     "6146b6138643b2ac0590df509dd51abaea769c79fd7602eb217168fe5af78cd2"),
+    ("androidx.annotation:annotation-jvm:1.6.0", "annotation-jvm-1.6.0.jar",
+     "60b10b5ef5769b79570172e015b8159405c92f034ba88b9391a977589c9deb4e"),
+    ("androidx.annotation:annotation-jvm:1.6.0", "annotation-jvm-1.6.0.module",
+     "3f5a8faa19de667e63dca9730ff8ef0e478e4bafb5feeb8258e5c086246dc90c"),
+    ("org.jetbrains.kotlin:kotlin-stdlib-common:2.2.10", "kotlin-stdlib-common-2.2.10.module",
+     "336afb512852028b1da5d5d07a6fb833cf9a797ee4b33519694d312f683227c9"),
+    ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4", "kotlinx-coroutines-android-1.6.4.jar",
+     "3fdc0eed5bc4b83ee9622774520a2db25470370eacd1581cac1e37704f095b00"),
+    ("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4", "kotlinx-coroutines-core-1.6.4.module",
+     "a6eed4a1835588e7c84fcd7b0475fce9a7b3444c870ebc797b88ba64ccf4576b"),
+    ("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4", "kotlinx-coroutines-core-jvm-1.6.4.jar",
+     "c24c8bb27bb320c4a93871501a7e5e0c61607638907b197aef675513d4c820be"),
+    ("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4", "kotlinx-coroutines-core-jvm-1.6.4.module",
+     "0d94c8a41483e7c2707ebd693e1b1357a84152998ce85550ebbc54ca4321a3a7"),
+    ("androidx.tracing:tracing:1.0.0", "tracing-1.0.0.aar",
+     "07b8b6139665b884a162eccf97891ca50f7f56831233bf25168ae04f7b568612"),
+]
 PATHS = [
     'security/b2-g2/settings.gradle.kts',
     'security/b2-g2/build.gradle.kts',
@@ -33,6 +56,35 @@ PATHS = [
 
 def sha(raw):
     return hashlib.sha256(raw).hexdigest()
+
+
+def approved_metadata():
+    """Preserve every baseline byte; insert only the ten reviewed exact records."""
+    text = subprocess.check_output(
+        ['git', 'show', ACCEPTED_B2 + ':gradle/verification-metadata.xml'], cwd=ROOT,
+    ).decode()
+    for coordinate in dict.fromkeys(row[0] for row in APPROVED_CHECKSUMS):
+        group, name, version = coordinate.split(':')
+        opening = f'      <component group="{group}" name="{name}" version="{version}">'
+        entries = [row for row in APPROVED_CHECKSUMS if row[0] == coordinate]
+        block = ''.join(
+            f'         <artifact name="{artifact}">\n'
+            f'            <sha256 value="{digest}" origin="G2-P01 verified upstream bytes"/>\n'
+            '         </artifact>\n'
+            for _, artifact, digest in entries
+        )
+        if opening in text:
+            end = text.index('      </component>', text.index(opening))
+            text = text[:end] + block + text[end:]
+        else:
+            block = opening + '\n' + block + '      </component>\n'
+            text = text.replace('   </components>', block + '   </components>')
+    return text.encode()
+
+
+def verify_metadata(raw):
+    assert len(APPROVED_CHECKSUMS) == 10 and len(set(APPROVED_CHECKSUMS)) == 10
+    assert raw == approved_metadata(), 'STOP: metadata differs from baseline plus exact G2-P01 ten additions'
 
 
 def write_json(name, value):
@@ -66,10 +118,12 @@ def preflight():
     write_json('changed-files.json', [{'path': p, 'sha256': sha((ROOT / p).read_bytes())} for p in PATHS])
     identity = subprocess.check_output(['git', 'rev-parse', 'HEAD', 'HEAD^{tree}'], cwd=ROOT, text=True).splitlines()
     write_json('source.json', {'base': BASE, 'head': identity[0], 'tree': identity[1], 'acceptedB2': ACCEPTED_B2})
-    for path in ['gradle/libs.versions.toml', 'gradle/verification-metadata.xml']:
-        reference = subprocess.check_output(['git', 'show', ACCEPTED_B2 + ':' + path], cwd=ROOT)
-        assert (HARNESS / path).read_bytes() == reference, 'Only exact accepted B2 copies are authorized'
-    assert 'verify-metadata>true' in (HARNESS / 'gradle/verification-metadata.xml').read_text()
+    reference = subprocess.check_output(['git', 'show', ACCEPTED_B2 + ':gradle/libs.versions.toml'], cwd=ROOT)
+    assert (HARNESS / 'gradle/libs.versions.toml').read_bytes() == reference, 'Catalog must remain byte-exact'
+    metadata = (HARNESS / 'gradle/verification-metadata.xml').read_bytes()
+    verify_metadata(metadata)
+    write_json('checksum-policy.json', {'baselineArtifactRecords': 784, 'approvedAdditions': APPROVED_CHECKSUMS,
+                                       'metadataSha256': sha(metadata), 'strictVerification': True})
     command('java', ['java', '-version'])
     catalog = command('sdk-list', ['sdkmanager', '--list']).stdout
     requested = f"system-images;android-{os.environ['G2_API']};{os.environ['G2_TARGET']};x86_64"
@@ -241,12 +295,24 @@ def inspect():
         assert not any('argon2' in name.lower() and name.endswith('.so') for name in archive.namelist())
     files = [target, test, *xmls, *(mapping_root / name for name in ['mapping.txt', 'usage.txt', 'configuration.txt'])]
     hashes = [{'path': str(path.relative_to(ROOT)), 'sha256': sha(path.read_bytes())} for path in files]
+    test_r8 = [line for line in (REPORT / 'build.log').read_text().splitlines()
+               if line.startswith('> Task :minifyReleaseAndroidTestWithR8')]
+    test_maps = [path for path in (HARNESS / 'build/outputs/mapping').rglob('mapping.txt')
+                 if path.parent != mapping_root]
+    test_minification = {
+        'taskLog': test_r8,
+        'mappingFiles': [{'path': str(path.relative_to(ROOT)), 'sha256': sha(path.read_bytes())} for path in test_maps],
+        'classification': 'R8_TASK_EXECUTED' if any(
+            not any(flag in line for flag in ['SKIPPED', 'NO-SOURCE']) for line in test_r8
+        ) else 'NOT-VERIFIED',
+    }
     write_json('summary.json', {
         'source': json.loads((REPORT / 'source.json').read_text()), 'cell': os.environ['G2_CELL'],
         'junit': totals, 'junitFiles': junit, 'metricsRows': len(metrics), 'metricsSha256': sha((REPORT / 'metrics.jsonl').read_bytes()),
         'r8Target': 'PASS', 'providerInTargetDex': 'PASS', 'providerAbsentFromTestDex': 'PASS',
         'canaryRemoved': 'PASS', 'providerClassMapping': provider, 'apkZip16KiB': 'PASS', 'elf': elf,
         'pageSize': expected_page, 'abi': 'x86_64', 'api': expected_api, 'hashes': hashes,
+        'testApkMinification': test_minification,
         'arm64Runtime': 'ENV-BLOCKED', 'arm64Kernel16KiB': 'ENV-BLOCKED', 'nativeOom': 'NOT-VERIFIED',
         'page16KiBKind': 'SIMULATED_X86_USERSPACE' if expected_page == 16384 else '4_KiB',
     })
