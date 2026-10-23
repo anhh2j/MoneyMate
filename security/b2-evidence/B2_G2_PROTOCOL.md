@@ -576,7 +576,7 @@ Theo PO6368999821/Leader6368952905, delta chỉ inspector/protocol trên mốc P
 metadata796/catalog/dependencies/toolchain/test/KAT/runner/workflow/gate/production.
 
 Collector `p12-build/` và `p12-runtime/` sinh `members.json` + `members.md`, source/hash
-manifest và25 controls. Hai hook dùng safe diagnostic wrapper sau build/oracle và
+manifest và27 controls. Hai hook dùng safe diagnostic wrapper sau build/oracle và
 sau instrumentation/P10; không thay exit/acceptance cũ. API26 lỗi clear-logcat vẫn
 dừng trước instrumentation, chỉ có build report. CI nền phải cùng HEAD,4 cell tối đa
 30 phút/cell, retention3 ngày; QA độc lập trước Leader review, PR17/18 giữ Draft.
@@ -632,11 +632,14 @@ khác nhau ghi ambiguity. Non-JAR inputs ghi unindexed, actual final program DEX
 decode đầy đủ. Classfile ABI/CP không phải per-method execution. Report có mapping/
 usage/input/DEX/APK/XML hashes và table coverage để QA kiểm toán từng row.
 
-25 controls kiểm class-only khác member proof, exact overload/descriptor, inheritance
+27 controls kiểm class-only khác member proof, exact overload/descriptor, inheritance
 field/method và interface precedence, constructor không inherited, incomplete owner/
 parent, static-kind, member rename khác removal/class-map, array/obfuscated descriptor,
 tên member chứa L, malformed mapping, stale/live renamed references, ambiguous interfaces,
 clinit không inherited và taxonomy observed/static/annotation/ID-only.
+Thêm2 controls cho selected-library facade inherited ABI và constructor không inherited.
+Selected provider ABI lookup theo cả superclass/interfaces, ghi declaringClass/hash;
+không kết luận thiếu provider member chỉ vì facade không tự khai báo method đó.
 Controls chỉ trên dữ liệu synthetic, không mutate APK/input/source hay gate.
 
 P11 exemplar cần chứng minh lại: mapping kotlin.text.Charsets→q; actual Lq; có
@@ -652,6 +655,18 @@ class identity root/allowoptimization riêng phải trình Leader/PO với evide
 đề xuất giữ mọi Charsets member/namespace, không thêm dependency. Các conditional gaps
 khác cần review actual call-path và source-to-final-DEX riêng, không tự nối keep theo
 crash. Chưa chứng minh minimum toàn cục/đủ5 test bodies/JNI/KAT/20 metrics.
+
+Phương án thiết kế bổ sung cho review (không áp dụng): rà cùng một lượt bề mặt direct
+test entry/helper thay vì chỉ UTF_8. Các CONDITIONAL signatures đã có test DEX sites và
+selected stdlib ABI: Intrinsics.areEqual(Object,Object):boolean; ArraysKt.first(Object[]):Object
+và ArraysKt.joinToString$default với descriptor
+`([Ljava/lang/Object;Ljava/lang/CharSequence;Ljava/lang/CharSequence;Ljava/lang/CharSequence;ILjava/lang/CharSequence;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Ljava/lang/String;`
+đều declared tại ArraysKt___ArraysKt; CollectionsKt.listOf(Object[]):java.util.List
+declared tại CollectionsKt__CollectionsKt. Contract cần exact method names/descriptors,
+facade identity + inherited lookup và descriptor types như Function1 theo selected ABI;
+không suy tất cả parent class/member phải giữ tên hoặc mọi branch library body đều cần.
+Đây là tập candidate5 signatures gồm UTF_8 observed +4 conditional, không bảo đảm đủ
+closure/JNI/KAT. Leader/PO phải quyết định scope/allowlist và kế hoạch kiểm chứng riêng.
 
 Nếu cần sửa keep/dependency/acceptance để chữa gap: STOP xin PO quyết định riêng.
 API26 logcat, permission AndroidX, apksigner/aapt, license collector/legal và ARM64 thật/

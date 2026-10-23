@@ -1848,6 +1848,25 @@ def p12_classify(resolution, site_kinds, observed):
     return 'CONDITIONAL', 'STATIC_USE_WITHOUT_EXECUTION_PROOF'
 
 
+def p12_provider_members(owner, signature, kind, index, read_abi, preferred_apk):
+    queue, visited, found = [owner], set(), []
+    while queue:
+        name = queue.pop(0)
+        if name in visited: continue
+        visited.add(name); providers = index.get(name, [])
+        preferred = [p for p in providers if p['apk'] == preferred_apk and p['role'] == 'programClasses']
+        if preferred: providers = preferred
+        for provider in providers:
+            body = read_abi(provider); category = 'fields' if kind == 'FIELD' else 'methods'
+            declarations = [m for m in body[category] if m['name'] + (':' if kind == 'FIELD' else '') + m['descriptor'] == signature]
+            if declarations:
+                found.append(dict(source=provider, declaringClass=name, classSha256=body['classSha256'], declarations=declarations))
+            elif not signature.startswith(('<init>(', '<clinit>(')):
+                if body['superclass']: queue.append(body['superclass'])
+                queue.extend(body['interfaces'])
+    return found
+
+
 def p12_negative_controls():
     def body(fields=None, methods=None, parent=None, interfaces=None):
         return dict(fields=fields or {}, methods=methods or {}, superclass=parent, interfaces=interfaces or [], provider='PROGRAM')
@@ -1877,6 +1896,14 @@ def p12_negative_controls():
     check('method-overload-descriptor', not lookup('LA;', 'run(I)V', 'METHOD')['matches'])
     ambiguous = dict(base, **{'LJ;': body({'live:I': 9}), 'LK;': body(interfaces=['LI;', 'LJ;'])})
     check('ambiguous-interface-not-verified', not lookup('LK;', 'live:I', 'FIELD', ambiguous)['complete'])
+    provider_index = {'LA;': [dict(apk='target', role='programClasses', owner='LA;')],
+                      'LB;': [dict(apk='target', role='programClasses', owner='LB;')]}
+    classfiles = {'LA;': dict(fields=[], methods=[dict(name='run', descriptor='()V', flags=9)],
+                    superclass=None, interfaces=[], classSha256='synthetic-A'),
+                 'LB;': dict(fields=[], methods=[], superclass='LA;', interfaces=[], classSha256='synthetic-B')}
+    inherited = p12_provider_members('LB;', 'run()V', 'METHOD', provider_index, lambda p: classfiles[p['owner']], 'target')
+    check('selected-facade-inherited-ABI', inherited[0]['declaringClass'] == 'LA;')
+    check('selected-constructor-not-inherited', not p12_provider_members('LB;', '<init>()V', 'METHOD', provider_index, lambda p: classfiles[p['owner']], 'target'))
     check('obfuscated-descriptor-types', p12_remap('(La/A;)[La/A;', {'La/A;': 'Lq;'}) == '(Lq;)[Lq;')
     check('member-name-L-is-not-descriptor', p12_remap('getLoader(La/A;)La/A;', {'La/A;': 'Lq;'}) == 'getLoader(Lq;)Lq;')
     check('malformed-mapping-explicit-error', bool(p12_mapping('a.A -> q:\n    unsupported -> x\n', '')['parseErrors']))
@@ -2005,14 +2032,7 @@ def p12_collect(phase):
         original_owner = unmap.get(owner, owner); original_signature = p12_remap(signature, unmap)
         if len({(r['originalOwner'], p12_signature(r)) for r in origin_candidates}) == 1:
             original_owner = origin_candidates[0]['originalOwner']; original_signature = p12_signature(origin_candidates[0])
-        providers = index.get(original_owner, [])
-        preferred = [p for p in providers if p['apk'] == provider_apk and p['role'] == 'programClasses']
-        if preferred: providers = preferred
-        provider_rows = []
-        for p in providers:
-            b = abi(p); category = 'fields' if kind == 'FIELD' else 'methods'
-            declarations = [m for m in b[category] if m['name'] + (':' if kind == 'FIELD' else '') + m['descriptor'] == original_signature]
-            if declarations: provider_rows.append(dict(source=p, classSha256=b['classSha256'], declarations=declarations))
+        provider_rows = p12_provider_members(original_owner, original_signature, kind, index, abi, provider_apk)
         removed = removed_members.get((original_owner, original_signature, kind), []) + removed_members.get((original_owner, '', 'CLASS'), [])
         renamed = []
         for apk_kind, record in original_members.get((original_owner, original_signature, kind), []):
