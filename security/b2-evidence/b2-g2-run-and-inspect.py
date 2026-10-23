@@ -18,6 +18,8 @@ HARNESS = ROOT / 'security/b2-g2'
 REPORT = HARNESS / 'build/reports/b2-g2'
 BASE = '690a74af29897d43fcb9f4c58808ae6ea2e3365f'
 ACCEPTED_B2 = 'be26d275d621c4a0c64ed9dd5fb89cad42bf91b2'
+P05_CATALOG_ALIAS = b'b2-errorprone-annotations = { module = "com.google.errorprone:error_prone_annotations", version = "2.36.0" }\n'
+P05_CLASSES = ['com.google.errorprone.annotations.CanIgnoreReturnValue', 'com.google.errorprone.annotations.MustBeClosed']
 # G2-P01: Leader6354820006, official PO authorization6355498984.
 # G2-P03: official PO authorization6356299057; only the final metadata record.
 APPROVED_CHECKSUMS = [
@@ -94,6 +96,37 @@ def verify_metadata(raw):
     assert raw == approved_metadata(), 'STOP: metadata differs from baseline plus exact ten P01 and one P03 additions'
 
 
+def approved_catalog():
+    baseline = subprocess.check_output(['git', 'show', ACCEPTED_B2 + ':gradle/libs.versions.toml'], cwd=ROOT)
+    assert baseline.count(b'[libraries]\n') == 1
+    return baseline.replace(b'[libraries]\n', b'[libraries]\n' + P05_CATALOG_ALIAS, 1)
+
+
+def verify_catalog(raw):
+    assert raw == approved_catalog(), 'STOP: catalog differs from baseline plus exact P05 alias'
+
+
+def catalog_negative_controls(raw):
+    verify_catalog(raw)
+    controls = {
+        'alias-missing': raw.replace(P05_CATALOG_ALIAS, b''),
+        'alias-version-drift': raw.replace(P05_CATALOG_ALIAS, P05_CATALOG_ALIAS.replace(b'2.36.0', b'2.27.0')),
+        'baseline-version-drift': raw.replace(b'agp = "9.4.1"', b'agp = "9.4.0"'),
+        'extra-alias': raw + b'\nunapproved = { id = "synthetic.plugin", version = "1" }\n',
+        'alias-renamed': raw.replace(b'b2-errorprone-annotations =', b'b2-unapproved-annotations ='),
+    }
+    results = []
+    for name, value in controls.items():
+        assert value != raw
+        try:
+            verify_catalog(value)
+        except AssertionError:
+            results.append({'case': name, 'result': 'REJECTED'})
+        else:
+            raise AssertionError('Catalog accepted negative control: ' + name)
+    write_json('p05-catalog-negative-controls.json', {'status': 'PASS', 'controls': results, 'sourceFilesMutated': False})
+
+
 def write_json(name, value):
     (REPORT / name).write_text(json.dumps(value, indent=2) + '\n')
 
@@ -157,7 +190,12 @@ def preflight():
     identity = subprocess.check_output(['git', 'rev-parse', 'HEAD', 'HEAD^{tree}'], cwd=ROOT, text=True).splitlines()
     write_json('source.json', {'base': BASE, 'head': identity[0], 'tree': identity[1], 'acceptedB2': ACCEPTED_B2})
     reference = subprocess.check_output(['git', 'show', ACCEPTED_B2 + ':gradle/libs.versions.toml'], cwd=ROOT)
-    assert (HARNESS / 'gradle/libs.versions.toml').read_bytes() == reference, 'Catalog must remain byte-exact'
+    catalog = (HARNESS / 'gradle/libs.versions.toml').read_bytes()
+    verify_catalog(catalog)
+    catalog_negative_controls(catalog)
+    write_json('catalog-policy.json', {'authority': 'Issue16 comment6357366408', 'acceptedB2': ACCEPTED_B2,
+                                       'baselineSha256': sha(reference), 'catalogSha256': sha(catalog),
+                                       'approvedInsertion': P05_CATALOG_ALIAS.decode().strip()})
     metadata = (HARNESS / 'gradle/verification-metadata.xml').read_bytes()
     verify_metadata(metadata)
     guard_negative_controls(metadata)
@@ -188,6 +226,9 @@ def build():
            ':lintRelease', ':exportB2G2Inventory', ':build-logic:exportBuildDependencies')
     gradle('target-dependencies', ':dependencies', '--configuration', 'releaseRuntimeClasspath')
     gradle('test-dependencies', ':dependencies', '--configuration', 'releaseAndroidTestRuntimeClasspath')
+    gradle('test-errorprone-insight', ':dependencyInsight', '--dependency', 'com.google.errorprone:error_prone_annotations',
+           '--configuration', 'releaseAndroidTestCompileClasspath')
+    verify_test_resolution()
     tools = pathlib.Path(os.environ['G2_TOOLS'])
     command('install-scanners', ['python3', 'scripts/install_security_tools.py', str(tools)])
     command('secrets-history', [str(tools / 'gitleaks'), 'git', '--redact=100', '--no-banner',
@@ -205,6 +246,35 @@ def build():
                                  '--format', 'json', '--output', str(REPORT / (name + '-vulnerabilities.json')),
                                  str(inventory)])
         license_inventory(inventory, tools)
+
+
+def verify_test_resolution():
+    coordinate = 'com.google.errorprone:error_prone_annotations:2.36.0'
+    target = (REPORT / 'target-dependencies.log').read_text()
+    test = (REPORT / 'test-dependencies.log').read_text()
+    compile_graph = (REPORT / 'test-errorprone-insight.log').read_text()
+    assert 'com.google.errorprone:error_prone_annotations:' not in target, 'Test dependency leaked into target graph'
+    assert coordinate in test and coordinate in compile_graph, 'Missing P05 test compile/runtime resolution'
+    pattern = r'com\.google\.errorprone:error_prone_annotations:([0-9][^\s]*)(?:\s+->\s+(\S+))?'
+    for graph in [test, compile_graph]:
+        selected = {replacement or requested for requested, replacement in re.findall(pattern, graph)}
+        assert selected == {'2.36.0'}, f'STOP: P05 test selected versions {selected}'
+    cache = pathlib.Path(os.environ.get('GRADLE_USER_HOME', pathlib.Path.home() / '.gradle')) / 'caches/modules-2/files-2.1'
+    jars = list((cache / 'com.google.errorprone/error_prone_annotations/2.36.0').glob('*/error_prone_annotations-2.36.0.jar'))
+    assert jars, 'No resolved P05 JAR'
+    hashes = []
+    for jar in jars:
+        digest = sha(jar.read_bytes())
+        assert digest == '77440e270b0bc9a249903c5a076c36a722c4886ca4f42675f2903a1c53ed61a5'
+        with zipfile.ZipFile(jar) as archive:
+            assert all(name.replace('.', '/') + '.class' in archive.namelist() for name in P05_CLASSES)
+        hashes.append({'file': jar.name, 'sha256': digest, 'classesPresent': P05_CLASSES})
+    write_json('p05-test-resolution.json', {
+        'authority': 'Issue16 comment6357366408', 'status': 'PASS', 'coordinate': coordinate,
+        'targetRuntimeAbsent': True, 'testCompileAndRuntimePresent': True, 'jarArtifacts': hashes,
+        'graphLogs': {name: sha((REPORT / name).read_bytes()) for name in [
+            'target-dependencies.log', 'test-dependencies.log', 'test-errorprone-insight.log']},
+    })
 
 
 def license_inventory(inventory, tools):
@@ -373,6 +443,8 @@ def apk_classes(path):
 
 def inspect():
     verify_toolchain()
+    verify_catalog((HARNESS / 'gradle/libs.versions.toml').read_bytes())
+    verify_test_resolution()
     commands = json.loads((REPORT / 'commands.json').read_text())
     assert all(row['exit'] == 0 for row in commands if row['required'])
     assert any(row['label'] == 'instrumented' and row['exit'] == 0 for row in commands)
@@ -468,6 +540,22 @@ def inspect():
                if line.startswith('> Task :minifyReleaseAndroidTestWithR8')]
     test_maps = [path for path in (HARNESS / 'build/outputs/mapping').rglob('mapping.txt')
                  if path.parent != mapping_root]
+    assert not any(name.startswith('Lcom/google/errorprone/annotations/') for name in target_classes)
+    assert not re.search(r'^com\.google\.errorprone\.annotations\.', mapping, re.M), 'P05 dependency in target mapping'
+    test_mapping = '\n'.join(path.read_text() for path in test_maps)
+    test_usage_paths = [path.parent / 'usage.txt' for path in test_maps if (path.parent / 'usage.txt').exists()]
+    test_usage = '\n'.join(path.read_text() for path in test_usage_paths)
+    annotation_classes = []
+    for original in P05_CLASSES:
+        match = re.search(r'^' + re.escape(original) + r' -> ([^\s]+):$', test_mapping, re.M)
+        renamed = match.group(1) if match else original
+        present = 'L' + renamed.replace('.', '/') + ';' in test_classes
+        annotation_classes.append({
+            'original': original, 'mappedName': renamed, 'presentInTestDex': present,
+            'listedInTestUsage': original in test_usage,
+            'classification': 'RETAINED_IN_TEST_DEX' if present else (
+                'REMOVED_BY_TEST_R8' if original in test_usage else 'NOT-VERIFIED'),
+        })
     test_minification = {
         'taskLog': test_r8,
         'mappingFiles': [{'path': str(path.relative_to(ROOT)), 'sha256': sha(path.read_bytes())} for path in test_maps],
@@ -475,6 +563,16 @@ def inspect():
             not any(flag in line for flag in ['SKIPPED', 'NO-SOURCE']) for line in test_r8
         ) else 'NOT-VERIFIED',
     }
+    assert test_minification['classification'] == 'R8_TASK_EXECUTED', 'Test APK R8 not verified'
+    write_json('p05-apk-isolation.json', {
+        'testResolution': json.loads((REPORT / 'p05-test-resolution.json').read_text()),
+        'targetErrorProneDependencyAbsent': True, 'annotationClasses': annotation_classes,
+        'testUsageFiles': [{'path': str(path.relative_to(ROOT)), 'sha256': sha(path.read_bytes())}
+                           for path in test_usage_paths],
+        'targetApkSha256': sha(target.read_bytes()), 'testApkSha256': sha(test.read_bytes()),
+        'testApkR8': test_minification,
+        'note': 'Annotation retention/removal is observed separately from classpath availability and JNI/KAT execution.',
+    })
     write_json('summary.json', {
         'source': json.loads((REPORT / 'source.json').read_text()), 'cell': os.environ['G2_CELL'],
         'junit': totals, 'junitFiles': junit, 'metricsRows': len(metrics), 'metricsSha256': sha((REPORT / 'metrics.jsonl').read_bytes()),

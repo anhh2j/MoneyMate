@@ -45,6 +45,7 @@ dependencies {
     implementation(libs.b2.argon2kt)
     androidTestImplementation(libs.b2.runner)
     androidTestImplementation(libs.b2.junit)
+    androidTestImplementation(libs.b2.errorprone.annotations)
 }
 
 tasks.register("exportB2G2Toolchain") {

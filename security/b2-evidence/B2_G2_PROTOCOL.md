@@ -7,8 +7,8 @@ Only the twelve paths approved through PO G2-P04 are used; the inspector enforce
 This separate Gradle application root is not included in MoneyMate settings/graph.
 Argon2Kt1.6.0 is implementation only in this disposable test target. The production
 MoneyMate app/security remain unchanged. No PIN/key lifecycle is implemented.
-Catalog is an exact copy from accepted B2 HEAD
-be26d275d621c4a0c64ed9dd5fb89cad42bf91b2. Verification metadata preserves all784
+Catalog preserves every baseline byte from accepted B2 HEAD
+be26d275d621c4a0c64ed9dd5fb89cad42bf91b2 plus the one exact P05 test-only alias below. Verification metadata preserves all784
 baseline artifact records/configuration and inserts only ten G2-P01 records and one
 G2-P03 record below, for795 total. Prior ten approved records remain unchanged.
 The guard reconstructs baseline bytes plus precisely those insertions and rejects any
@@ -166,3 +166,36 @@ HIGH/CRITICAL vulnerability gates are unchanged. License provenance/classificati
 is evidence for independent QA, not a legal PASS; missing declarations remain explicitly
 NOT-VERIFIED, never silently omitted. Scanner execution errors still fail the command.
 No ignored-license list or policy exemption is introduced.
+
+## G2-P05 test-only Error Prone annotation dependency
+
+Authority: official PO approval Issue16 comment6357366408 (23/10/2026), following
+Leader6357294759, QA6357275532 and Developer6357124891. Only standalone catalog,
+build.gradle.kts, inspector and this protocol change; twelve paths total, no thirteenth.
+
+Exact insertion immediately after [libraries]:
+`b2-errorprone-annotations = { module = "com.google.errorprone:error_prone_annotations", version = "2.36.0" }`
+Only androidTestImplementation(libs.b2.errorprone.annotations) is added. It is not a
+target implementation/production dependency. AGP9.4.1/KGP-compiler-BTA2.4.21,
+R8 tasks/keep rules/KAT and all other dependencies/versions remain unchanged.
+
+Upstream Maven Central coordinate com.google.errorprone:error_prone_annotations:2.36.0:
+https://repo.maven.apache.org/maven2/com/google/errorprone/error_prone_annotations/2.36.0/
+JAR SHA256 77440e270b0bc9a249903c5a076c36a722c4886ca4f42675f2903a1c53ed61a5
+POM SHA256 d79cfd37c85f76d6b754c7501ee1dc8447b7b2642c2382d778252166bd331e9c
+Both were independently fetched and matched existing baseline metadata. The JAR
+contains CanIgnoreReturnValue and MustBeClosed; no checksum is added to the795 records.
+The catalog guard reconstructs accepted B2 bytes plus exactly the approved insertion,
+rejecting omissions/version changes/renames/extra aliases or other baseline edits.
+Catalog policy and five negative controls are uploaded per cell, with existing P04 controls.
+
+After strict build, actual test compile dependencyInsight and target/test runtime
+resolution reports must show2.36.0 in test and its absence from target runtime. The
+cached resolved JAR must match its existing pin and contain both annotation class files.
+The APK inspector checks target mapping/DEX for absence of this test-only dependency,
+records actual annotation definitions/removal in test DEX/mapping/usage, and requires
+the test APK R8 task to have executed. Optimizer retention/removal is reported separately;
+classpath evidence is not used to invent post-R8 class presence or runtime JNI PASS.
+Existing provider-in-target/provider-absent-from-test, matching signatures, KAT/JUnit,
+page-size/memory, strict lint/security/license gates remain mandatory. No dontwarn,
+blanket keep, task bypass, new checksum or production dependency is authorized.
