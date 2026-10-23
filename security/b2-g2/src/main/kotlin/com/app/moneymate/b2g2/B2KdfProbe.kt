@@ -7,6 +7,8 @@ import com.lambdapioneer.argon2kt.Argon2Version
 
 /** Target APK facade for the isolated experiment. No MoneyMate production caller. */
 object B2KdfProbe {
+    private const val SMALL_VECTOR_MEMORY_KIB = 256
+
     @JvmStatic
     fun nativeLoad() = Argon2Kt.assertJniWorking()
 
@@ -22,7 +24,7 @@ object B2KdfProbe {
     fun encode(
         input: ByteArray,
         salt: ByteArray,
-    ): String = hash(input, salt, 256, 2).encodedOutputAsString()
+    ): String = hash(input, salt, SMALL_VECTOR_MEMORY_KIB, 2).encodedOutputAsString()
 
     @JvmStatic
     fun verify(
@@ -38,9 +40,9 @@ object B2KdfProbe {
     ): Boolean =
         try {
             when (case) {
-                "SHORT_SALT" -> hash(input, ByteArray(2), 256, 2)
+                "SHORT_SALT" -> hash(input, ByteArray(2), SMALL_VECTOR_MEMORY_KIB, 2)
                 "ZERO_MEMORY" -> hash(input, salt, 0, 2)
-                "ZERO_ITERATIONS" -> hash(input, salt, 256, 0)
+                "ZERO_ITERATIONS" -> hash(input, salt, SMALL_VECTOR_MEMORY_KIB, 0)
                 "BAD_ENCODING" -> verify("SYNTHETIC_INVALID_ENCODING", input)
                 else -> error("Unknown synthetic test case")
             }

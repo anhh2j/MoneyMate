@@ -1,6 +1,19 @@
 import groovy.json.JsonOutput
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.artifacts.result.UnresolvedDependencyResult
+import java.security.MessageDigest
+
+// G2-P02 option B: match the observed MoneyMate compiler toolchain, not AGP's default.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.21")
+    }
+}
 
 plugins {
     alias(libs.plugins.android.application)
@@ -40,6 +53,68 @@ dependencies {
     implementation(libs.b2.argon2kt)
     androidTestImplementation(libs.b2.runner)
     androidTestImplementation(libs.b2.junit)
+}
+
+tasks.register("exportB2G2Toolchain") {
+    doLast {
+        val scopes =
+            listOf(
+                "buildscript:classpath" to buildscript.configurations.getByName("classpath"),
+                "module:kotlinCompilerClasspath" to configurations.getByName("kotlinCompilerClasspath"),
+                "module:kotlinBuildToolsApiClasspath" to configurations.getByName("kotlinBuildToolsApiClasspath"),
+            )
+        val graphs =
+            scopes.map { (scope, configuration) ->
+                val result = configuration.incoming.resolutionResult
+                check(result.allDependencies.none { it is UnresolvedDependencyResult }) { "Unresolved toolchain: $scope" }
+                mapOf(
+                    "scope" to scope,
+                    "components" to
+                        result.allComponents.filter { it.id is ModuleComponentIdentifier }.mapNotNull { it.moduleVersion }.map {
+                            mapOf("group" to it.group, "name" to it.name, "version" to it.version)
+                        },
+                    "selectionReasons" to
+                        result.allComponents.map {
+                            mapOf(
+                                "id" to it.id.displayName,
+                                "reasons" to it.selectionReason.descriptions.map { reason -> reason.description },
+                            )
+                        },
+                    "edges" to
+                        result.allDependencies.filterIsInstance<ResolvedDependencyResult>().map {
+                            mapOf(
+                                "from" to it.from.id.displayName,
+                                "requested" to it.requested.displayName,
+                                "selected" to it.selected.id.displayName,
+                            )
+                        },
+                )
+            }
+        val directory =
+            layout.buildDirectory
+                .dir("reports/b2-g2")
+                .get()
+                .asFile
+        directory.mkdirs()
+        // Persist selection evidence even if subsequent artifact verification fails.
+        directory.resolve("toolchain-graph.json").writeText(JsonOutput.toJson(mapOf("graphs" to graphs)))
+        val artifacts =
+            scopes.flatMap { (scope, configuration) ->
+                configuration.incoming.artifacts.artifacts.map {
+                    mapOf(
+                        "scope" to scope,
+                        "component" to it.id.componentIdentifier.displayName,
+                        "artifact" to it.id.displayName,
+                        "file" to it.file.name,
+                        "sha256" to
+                            MessageDigest.getInstance("SHA-256").digest(it.file.readBytes()).joinToString("") { byte ->
+                                "%02x".format(byte)
+                            },
+                    )
+                }
+            }
+        directory.resolve("toolchain-artifacts.json").writeText(JsonOutput.toJson(artifacts))
+    }
 }
 
 tasks.register("exportB2G2Inventory") {

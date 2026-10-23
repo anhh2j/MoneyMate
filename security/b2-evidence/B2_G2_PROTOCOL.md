@@ -13,7 +13,7 @@ baseline artifact records/configuration and inserts only the ten G2-P01 records 
 The guard reconstructs baseline bytes plus precisely those insertions and rejects any
 other delta, including a changed hash/configuration, deletion or unapproved addition.
 The existing build-logic dependency policy is applied without modification.
-No checksums beyond G2-P01, lenient mode, trust wildcard, plugin upgrade or task workaround.
+No checksums beyond G2-P01, lenient mode, trust wildcard or task workaround.
 Stop and report a blocker if the proposed tasks/checksum policy do not work.
 
 Reproduction uses the repository wrapper with `-p security/b2-g2`, strict verification,
@@ -63,6 +63,32 @@ actual API/ABI/kernel/page-size/memory, JUnit5/0/0/0, metrics20, target/test APK
 signatures, mapping/DEX/ELF/ZIP evidence, inventory/security reports and failure logs.
 Actual results are submitted in Vietnamese on Issue16; no fabricated or pending PASS.
 Independent QA reviews the evidence before Leader decision; keep the new PR Draft.
+
+## G2-P02 option B — baseline compiler parity
+
+Authority: PO approval recorded by Leader in Issue16 comment6356080091 (23/10/2026),
+following assessment6355802110 and Leader6355871029. This supersedes the earlier
+read-only pause only within the approved eleven paths. Option A's sixteen compiler2.2.10
+checksums are not approved and must not be added. Metadata stays784+10, byte-exact.
+
+Standalone buildscript explicitly requests KGP2.4.21, matching baseline main690a74af's
+resolved buildscript and app/security compiler/BTA configurations. AGP stays9.4.1;
+there is no Compose UI or legacy kotlin-android plugin, root inclusion or production edit.
+The three256KiB literals in the target facade use one named constant with unchanged value.
+
+Before compilation/R8, exportB2G2Toolchain records toolchain-graph.json for buildscript
+classpath, kotlinCompilerClasspath and kotlinBuildToolsApiClasspath, with components,
+requested/selected edges and selection reasons. toolchain-artifacts.json records each
+resolved artifact's scope, component, filename and SHA256. The inspector requires KGP,
+compiler/build-tools impl/API selected2.4.21, AGP9.4.1, and all artifact hashes admitted by
+the unchanged strict metadata. It records toolchain-parity.json only after every check
+passes; a catalog declaration alone cannot satisfy this gate. Graph evidence is saved
+before artifact enumeration so a strict-verification failure can still be investigated.
+
+Any differing selected toolchain version, new checksum or need for a path outside the
+authorized scope is STOP/report. Subsequent build/security/license/runtime gates must
+be reported separately; compiler parity is not G2 runtime or production acceptance.
+The four-cell workflow,30-minute limits,three-day retention and all prior gates remain.
 
 ## G2-P01 exact checksum delta
 

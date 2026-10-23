@@ -140,8 +140,10 @@ def preflight():
 def build():
     tasks = gradle('tasks', 'tasks', '--all').stdout
     expected = ['minifyReleaseWithR8', 'assembleRelease', 'assembleReleaseAndroidTest',
-                'connectedReleaseAndroidTest', 'lintRelease', 'exportB2G2Inventory']
+                'connectedReleaseAndroidTest', 'lintRelease', 'exportB2G2Inventory', 'exportB2G2Toolchain']
     assert all(re.search(r'^' + name + r'(?:\s|$)', tasks, re.M) for name in expected), 'STOP: task graph mismatch'
+    gradle('toolchain', ':exportB2G2Toolchain')
+    verify_toolchain()
     gradle('build', ':minifyReleaseWithR8', ':assembleRelease', ':assembleReleaseAndroidTest',
            ':lintRelease', ':exportB2G2Inventory', ':build-logic:exportBuildDependencies')
     gradle('target-dependencies', ':dependencies', '--configuration', 'releaseRuntimeClasspath')
@@ -162,6 +164,55 @@ def build():
         command(name + '-scan', [str(tools / 'trivy'), 'sbom', '--severity', 'HIGH,CRITICAL', '--exit-code', '1',
                                  '--format', 'json', '--output', str(REPORT / (name + '-vulnerabilities.json')),
                                  str(inventory)])
+
+
+def verify_toolchain():
+    """G2-P02 B: require observed baseline selections and exact admitted artifact hashes."""
+    graph_path = REPORT / 'toolchain-graph.json'
+    artifact_path = REPORT / 'toolchain-artifacts.json'
+    graphs = json.loads(graph_path.read_text())['graphs']
+    artifacts = json.loads(artifact_path.read_text())
+    expected = {
+        'buildscript:classpath': {'kotlin-gradle-plugin', 'kotlin-build-tools-api'},
+        'module:kotlinCompilerClasspath': {'kotlin-build-tools-impl', 'kotlin-compiler-embeddable', 'kotlin-build-tools-api'},
+        'module:kotlinBuildToolsApiClasspath': {'kotlin-build-tools-impl', 'kotlin-compiler-embeddable', 'kotlin-build-tools-api'},
+    }
+    assert len(graphs) == len(expected) and {g['scope'] for g in graphs} == set(expected)
+    for graph in graphs:
+        components = graph['components']
+        for name in expected[graph['scope']]:
+            versions = {c['version'] for c in components if c['group'] == 'org.jetbrains.kotlin' and c['name'] == name}
+            assert versions == {'2.4.21'}, f"STOP: {graph['scope']} {name} selected {versions}, expected 2.4.21"
+        if graph['scope'] == 'buildscript:classpath':
+            assert {c['version'] for c in components if c['group'] == 'com.android.tools.build'
+                    and c['name'] == 'gradle'} == {'9.4.1'}, 'STOP: AGP drift'
+        assert graph['edges'] and graph['selectionReasons'], 'Missing resolution evidence'
+        for component in components:
+            if component['group'] == 'org.jetbrains.kotlin' and component['name'] in {
+                'kotlin-gradle-plugin', 'kotlin-compiler-embeddable', 'kotlin-build-tools-api', 'kotlin-build-tools-impl',
+            }:
+                assert component['version'] == '2.4.21', 'STOP: mixed toolchain'
+    metadata = (HARNESS / 'gradle/verification-metadata.xml').read_bytes()
+    verify_metadata(metadata)
+    ns = {'v': 'https://schema.gradle.org/dependency-verification'}
+    admitted = {}
+    for component in ET.fromstring(metadata).findall('v:components/v:component', ns):
+        coordinate = ':'.join(component.get(key) for key in ['group', 'name', 'version'])
+        for artifact in component.findall('v:artifact', ns):
+            admitted[(coordinate, artifact.get('name'))] = {h.get('value') for h in artifact.findall('v:sha256', ns)}
+    assert artifacts and {a['scope'] for a in artifacts} == set(expected), 'Incomplete artifact manifest'
+    for scope, names in expected.items():
+        for name in names:
+            assert any(a['scope'] == scope and a['component'] == f'org.jetbrains.kotlin:{name}:2.4.21'
+                       for a in artifacts), f'Missing critical artifact: {scope} {name}'
+    for artifact in artifacts:
+        assert artifact['sha256'] in admitted.get((artifact['component'], artifact['file']), set()), artifact
+    write_json('toolchain-parity.json', {
+        'authority': 'Issue16 comment6356080091', 'status': 'PASS',
+        'expectedKgpCompilerBta': '2.4.21', 'expectedAgp': '9.4.1',
+        'graphSha256': sha(graph_path.read_bytes()), 'artifactManifestSha256': sha(artifact_path.read_bytes()),
+        'artifactCount': len(artifacts), 'metadataSha256': sha(metadata),
+    })
 
 
 def instrument():
@@ -204,6 +255,7 @@ def apk_classes(path):
 
 
 def inspect():
+    verify_toolchain()
     commands = json.loads((REPORT / 'commands.json').read_text())
     assert all(row['exit'] == 0 for row in commands if row['required'])
     assert any(row['label'] == 'instrumented' and row['exit'] == 0 for row in commands)
