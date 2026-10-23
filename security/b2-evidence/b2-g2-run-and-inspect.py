@@ -508,7 +508,7 @@ def instrument():
     command('device-memory-before', ['adb', 'shell', 'dumpsys', 'meminfo'])
     command('kernel', ['adb', 'shell', 'uname', '-a'])
     emulator = str(pathlib.Path(os.environ['ANDROID_HOME']) / 'emulator/emulator')
-    command('emulator-version', [emulator, '-version'])
+    command('emulator-version', [emulator, '-no-window', '-version'])
     command('acceleration', [emulator, '-accel-check'])
     command('clear-logcat', ['adb', 'logcat', '-c'])
     try:
