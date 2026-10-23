@@ -296,6 +296,7 @@ def build():
                                  str(inventory)])
         license_inventory(inventory, tools)
     p07_safe('license', p07_license_diagnostics)
+    p07_safe('p10-build', lambda: p10_closure('build'))
 
 
 def write_p06_observer():
@@ -809,6 +810,7 @@ def instrument():
         p07_safe('after', lambda: p07_snapshot('after'))
         p07_safe('results', p07_result_index)
         p08_runtime_observation()
+        p07_safe('p10-runtime', lambda: p10_closure('runtime'))
 
 
 def dex_classes(raw):
@@ -937,6 +939,497 @@ def p08_runtime_observation():
         'crashLogSha256': sha(crash.read_bytes()) if crash.exists() else None,
         'note': 'Runtime observation only; all original JNI/KAT/metrics/environment/security/signature gates remain mandatory.',
     })
+
+
+# Diagnostic-only decoder. Instruction widths follow AOSP dex_instruction_list.h;
+# provenance and limits are recorded in B2_G2_PROTOCOL.md, never fetched during CI.
+P10_WIDTHS = '1123123123111111111232235223211221223331123332222222222222222200000022222222222222222222222222222222222222222233333033333001111111111111111111112222222222222222222222222222222211111111111111111111111111111111222222222222222222200000000000000000000000443322'
+
+
+def p10_types(descriptor):
+    return re.findall(r'L[^;]+;', descriptor)
+
+
+def p10_dex(raw, source):
+    """Definitions and actual instruction/annotation sites; no execution or APK changes."""
+    assert raw[:4] == b'dex\n' and len(P10_WIDTHS) == 256
+    u16 = lambda o: struct.unpack_from('<H', raw, o)[0]
+    u32 = lambda o: struct.unpack_from('<I', raw, o)[0]
+    assert u32(36) == 112 and u32(40) == 0x12345678, 'Unsupported DEX header/container/endian'
+
+    def leb(o, signed=False):
+        value, shift = 0, 0
+        while True:
+            byte = raw[o]; o += 1
+            value |= (byte & 127) << shift; shift += 7
+            assert shift <= 35
+            if not byte & 128:
+                return value - (1 << shift) if signed and byte & 64 else value, o
+
+    strings = []
+    for i in range(u32(56)):
+        _, o = leb(u32(u32(60) + i * 4))
+        strings.append(raw[o:raw.index(b'\x00', o)].decode('utf-8', errors='replace'))
+    types = [strings[u32(u32(68) + i * 4)] for i in range(u32(64))]
+
+    def typelist(o):
+        return [] if not o else [types[u16(o + 4 + i * 2)] for i in range(u32(o))]
+
+    protos = []
+    for i in range(u32(72)):
+        _, ret, params = struct.unpack_from('<III', raw, u32(76) + i * 12)
+        protos.append('(' + ''.join(typelist(params)) + ')' + types[ret])
+    fields, methods = [], []
+    for i in range(u32(80)):
+        c, t, n = struct.unpack_from('<HHI', raw, u32(84) + i * 8)
+        fields.append((types[c], strings[n] + ':' + types[t]))
+    for i in range(u32(88)):
+        c, p, n = struct.unpack_from('<HHI', raw, u32(92) + i * 8)
+        methods.append((types[c], strings[n] + protos[p]))
+    maps = {}
+    if u32(52):
+        for i in range(u32(u32(52))):
+            kind, _, count, offset = struct.unpack_from('<HHII', raw, u32(52) + 4 + i * 12)
+            maps[kind] = (count, offset)
+    refs, definitions, errors = [], {}, []
+
+    def add(type_name, kind, owner, member='', target_member='', pc=None, line=None, detail=''):
+        for base in p10_types(type_name):
+            refs.append(dict(type=base, kind=kind, owner=owner, member=member, referencedMember=target_member,
+                             dexPc=pc, dexLine=line, detail=detail))
+
+    def symbol(table, index, kind, owner, member, pc=None, line=None):
+        target, signature = table[index]
+        add(target, kind, owner, member, signature, pc, line)
+        add(signature, kind + '_SIGNATURE', owner, member, signature, pc, line)
+        return target + '->' + signature
+
+    def handle(index, kind, owner, member, pc=None, line=None):
+        count, base = maps.get(8, (0, 0)); assert index < count
+        category, _, index, _ = struct.unpack_from('<HHHH', raw, base + index * 8)
+        symbol(fields if category <= 3 else methods, index, kind, owner, member, pc, line)
+
+    def annotation(o, owner, member, kind):
+        index, o = leb(o); add(types[index], kind, owner, member)
+        size, o = leb(o)
+        for _ in range(size):
+            _, o = leb(o); o = encoded(o, owner, member, kind)
+        return o
+
+    def encoded(o, owner, member, kind):
+        tag = raw[o]; o += 1; value_type, width = tag & 31, (tag >> 5) + 1
+        if value_type == 0x1c:
+            count, o = leb(o)
+            for _ in range(count): o = encoded(o, owner, member, kind)
+        elif value_type == 0x1d:
+            o = annotation(o, owner, member, kind)
+        elif value_type not in [0x1e, 0x1f]:
+            value = int.from_bytes(raw[o:o + width], 'little'); o += width
+            if value_type == 0x18: add(types[value], kind, owner, member)
+            elif value_type in [0x19, 0x1b]: symbol(fields, value, kind, owner, member)
+            elif value_type == 0x1a: symbol(methods, value, kind, owner, member)
+            elif value_type == 0x15: add(protos[value], kind, owner, member)
+            elif value_type == 0x16: handle(value, kind, owner, member)
+        return o
+
+    def annotations(o, owner, member):
+        if not o: return
+        for i in range(u32(o)):
+            at = u32(o + 4 + i * 4)
+            annotation(at + 1, owner, member, 'ANNOTATION_' + str(raw[at]))
+
+    def debug_positions(o, owner, member):
+        positions = []
+        if not o: return positions
+        line, o = leb(o); count, o = leb(o)
+        for _ in range(count): _, o = leb(o)
+        pc = 0
+        while True:
+            op = raw[o]; o += 1
+            if op == 0: break
+            if op == 1:
+                delta, o = leb(o); pc += delta
+            elif op == 2:
+                delta, o = leb(o, True); line += delta
+            elif op in [3, 4]:
+                _, o = leb(o); _, o = leb(o); type_index, o = leb(o)
+                if type_index: add(types[type_index - 1], 'DEBUG_METADATA', owner, member)
+                if op == 4: _, o = leb(o)
+            elif op in [5, 6, 9]: _, o = leb(o)
+            elif op >= 10:
+                pc += (op - 10) // 15; line += -4 + (op - 10) % 15
+                positions.append((pc, line))
+        return positions
+
+    def code(o, owner, member):
+        size, tries, debug = u32(o + 12), u16(o + 6), u32(o + 8)
+        positions = debug_positions(debug, owner, member)
+        units = [u16(o + 16 + i * 2) for i in range(size)]
+        pc, position_index, line = 0, 0, None
+        while pc < size:
+            while position_index < len(positions) and positions[position_index][0] <= pc:
+                line = positions[position_index][1]; position_index += 1
+            word = units[pc]; op = word & 255
+            if op == 0 and word:
+                if word == 0x100: width = 4 + units[pc + 1] * 2
+                elif word == 0x200: width = 2 + units[pc + 1] * 4
+                elif word == 0x300: width = 4 + (units[pc + 1] * (units[pc + 2] | units[pc + 3] << 16) + 1) // 2
+                else: raise ValueError('Unknown DEX payload ' + str(word))
+            else:
+                width = int(P10_WIDTHS[op]); assert width > 0 and pc + width <= size, ('Unsupported opcode', op, pc)
+                if op in [0x1c, 0x1f, 0x20, 0x22, 0x23, 0x24, 0x25]:
+                    kind = 'NEW_INSTANCE' if op == 0x22 else 'TYPE_INSTRUCTION'
+                    add(types[units[pc + 1]], kind, owner, member, pc=pc, line=line, detail=hex(op))
+                elif 0x52 <= op <= 0x6d:
+                    symbol(fields, units[pc + 1], 'FIELD_ACCESS_' + hex(op), owner, member, pc, line)
+                elif 0x6e <= op <= 0x72 or 0x74 <= op <= 0x78 or op in [0xfa, 0xfb]:
+                    symbol(methods, units[pc + 1], 'INVOKE_' + hex(op), owner, member, pc, line)
+                    if op in [0xfa, 0xfb]: add(protos[units[pc + 3]], 'DYNAMIC_PROTO', owner, member, pc=pc, line=line)
+                elif op in [0xfc, 0xfd]:
+                    count, at = maps.get(7, (0, 0)); index = units[pc + 1]; assert index < count
+                    at = u32(at + index * 4); count, at = leb(at)
+                    for _ in range(count): at = encoded(at, owner, member, 'DYNAMIC_CALL_SITE')
+                elif op == 0xfe: handle(units[pc + 1], 'METHOD_HANDLE', owner, member, pc, line)
+                elif op == 0xff: add(protos[units[pc + 1]], 'METHOD_TYPE', owner, member, pc=pc, line=line)
+            pc += width
+        assert pc == size
+        if tries:
+            at = o + 16 + size * 2 + (2 if size % 2 else 0) + tries * 8
+            count, at = leb(at)
+            for _ in range(count):
+                number, at = leb(at, True)
+                for _ in range(abs(number)):
+                    index, at = leb(at); address, at = leb(at)
+                    add(types[index], 'CATCH_TYPE', owner, member, pc=address)
+                if number <= 0: _, at = leb(at)
+
+    for i in range(u32(96)):
+        at = u32(100) + i * 32
+        c, flags, parent, interfaces, _, ann, data, values = struct.unpack_from('<IIIIIIII', raw, at)
+        owner = types[c]
+        info = dict(flags=flags, superclass=None if parent == 0xffffffff else types[parent],
+                    interfaces=typelist(interfaces), methods={}, fields={})
+        definitions[owner] = info
+        for t in [info['superclass'], *info['interfaces']]:
+            if t: add(t, 'SUPERCLASS' if t == info['superclass'] else 'INTERFACE', owner)
+        if data:
+            sizes = []
+            for _ in range(4): value, data = leb(data); sizes.append(value)
+            for count in sizes[:2]:
+                index = 0
+                for _ in range(count):
+                    delta, data = leb(data); access, data = leb(data); index += delta
+                    field_owner, member = fields[index]; assert field_owner == owner
+                    info['fields'][member] = access; add(member, 'FIELD_SIGNATURE', owner, member)
+            for count in sizes[2:]:
+                index = 0
+                for _ in range(count):
+                    delta, data = leb(data); access, data = leb(data); code_offset, data = leb(data); index += delta
+                    method_owner, member = methods[index]; assert method_owner == owner
+                    info['methods'][member] = dict(flags=access, codeOffset=code_offset)
+                    add(member, 'METHOD_SIGNATURE', owner, member)
+                    if code_offset:
+                        try: code(code_offset, owner, member)
+                        except (AssertionError, IndexError, ValueError, struct.error) as error:
+                            errors.append(dict(owner=owner, member=member, codeOffset=code_offset, error=str(error)))
+        if values:
+            count, values = leb(values)
+            for _ in range(count): values = encoded(values, owner, '', 'STATIC_ENCODED_VALUE')
+        if ann:
+            annotations(u32(ann), owner, '')
+            at = ann + 16
+            for table, count in [(fields, u32(ann + 4)), (methods, u32(ann + 8))]:
+                for _ in range(count):
+                    index, offset = struct.unpack_from('<II', raw, at); at += 8
+                    annotations(offset, owner, table[index][1])
+            for _ in range(u32(ann + 12)):
+                index, offset = struct.unpack_from('<II', raw, at); at += 8
+                for parameter in range(u32(offset)):
+                    annotations(u32(offset + 4 + parameter * 4), owner, methods[index][1] + ':parameter' + str(parameter))
+    mentioned = {r['type'] for r in refs}
+    for t in types:
+        for base in p10_types(t):
+            if base not in mentioned: add(base, 'TYPE_IDS_ONLY', '', detail='No decoded use site; not a requirement')
+    return dict(source=source, dexSha256=sha(raw), definitions=definitions, references=refs, decodeErrors=errors)
+
+
+def p10_classfile(raw):
+    """Read declared ABI/hierarchy and CP symbols only; CP is not execution evidence."""
+    assert raw[:4] == b'\xca\xfe\xba\xbe'
+    u2 = lambda o: struct.unpack_from('>H', raw, o)[0]
+    u4 = lambda o: struct.unpack_from('>I', raw, o)[0]
+    pool, at, index, count = {}, 10, 1, u2(8)
+    while index < count:
+        tag = raw[at]; at += 1
+        if tag == 1:
+            size = u2(at); at += 2; pool[index] = (tag, raw[at:at + size].decode('utf-8', errors='replace')); at += size
+        elif tag in [3, 4]: pool[index] = (tag, None); at += 4
+        elif tag in [5, 6]: pool[index] = (tag, None); at += 8; index += 1
+        elif tag in [7, 8, 16, 19, 20]: pool[index] = (tag, u2(at)); at += 2
+        elif tag in [9, 10, 11, 12, 17, 18]: pool[index] = (tag, (u2(at), u2(at + 2))); at += 4
+        elif tag == 15: pool[index] = (tag, (raw[at], u2(at + 1))); at += 3
+        else: raise ValueError('Unknown class constant pool tag ' + str(tag))
+        index += 1
+    text = lambda i: pool[i][1]
+    typename = lambda i: 'L' + text(pool[i][1]) + ';' if i else None
+    flags, owner, parent = u2(at), typename(u2(at + 2)), typename(u2(at + 4)); at += 6
+    count = u2(at); at += 2; interfaces = [typename(u2(at + i * 2)) for i in range(count)]; at += count * 2
+    members = {}
+    for category in ['fields', 'methods']:
+        count = u2(at); at += 2; declarations = []
+        for _ in range(count):
+            access, name, descriptor, attrs = struct.unpack_from('>HHHH', raw, at); at += 8
+            declarations.append(dict(name=text(name), descriptor=text(descriptor), flags=access))
+            for _ in range(attrs): at += 6 + u4(at + 2)
+        members[category] = declarations
+    symbols = []
+    for tag, value in pool.values():
+        if tag in [9, 10, 11]:
+            c, signature = value; name, descriptor = pool[signature][1]
+            symbols.append(dict(owner=typename(c), name=text(name), descriptor=text(descriptor),
+                                kind='FIELD_CP' if tag == 9 else 'METHOD_CP'))
+    return dict(owner=owner, flags=flags, superclass=parent, interfaces=interfaces, **members,
+                symbols=symbols, classSha256=sha(raw), symbolsAre='CONSTANT_POOL_NOT_PER_METHOD_EXECUTION')
+
+
+def p10_classification(type_name, sites, observed, structural, provider_known):
+    if type_name in observed: return 'REQUIRED', 'OBSERVED_RUNTIME_MISSING_CLASS'
+    if type_name in structural: return 'REQUIRED', 'SUPERCLASS_OR_INTERFACE_OF_OBSERVED_REQUIRED_TYPE'
+    if sites and all(s['kind'].startswith(('ANNOTATION_', 'DEBUG_METADATA')) for s in sites):
+        return 'ANNOTATION-METADATA', 'ONLY_TYPED_ANNOTATION_DEBUG_SITES_NOT_PROOF_OF_RUNTIME_NEED'
+    if not provider_known or not sites or all(s['kind'] == 'TYPE_IDS_ONLY' for s in sites):
+        return 'UNKNOWN', 'NO_PROVIDER_OR_NO_DECODED_USE_SITE'
+    return 'CONDITIONAL', 'STATIC_REFERENCE_WITHOUT_EXECUTION_OR_BRANCH_PROOF'
+
+
+def p10_negative_controls():
+    site = lambda kind: [{'kind': kind}]
+    cases = [
+        ('observed', p10_classification('LX;', site('TYPE_IDS_ONLY'), {'LX;'}, set(), True)[0], 'REQUIRED'),
+        ('structural', p10_classification('LX;', [], set(), {'LX;'}, True)[0], 'REQUIRED'),
+        ('invoke-not-observed', p10_classification('LX;', site('INVOKE_0x70'), set(), set(), True)[0], 'CONDITIONAL'),
+        ('annotation-only', p10_classification('LX;', site('ANNOTATION_1'), set(), set(), True)[0], 'ANNOTATION-METADATA'),
+        ('mixed-annotation-invoke', p10_classification('LX;', site('ANNOTATION_1') + site('INVOKE_0x70'), set(), set(), True)[0], 'CONDITIONAL'),
+        ('type-pool-only', p10_classification('LX;', site('TYPE_IDS_ONLY'), set(), set(), True)[0], 'UNKNOWN'),
+        ('provider-unknown', p10_classification('LX;', site('FIELD_SIGNATURE'), set(), set(), False)[0], 'UNKNOWN'),
+        ('signature-not-executed', p10_classification('LX;', site('METHOD_SIGNATURE'), set(), set(), True)[0], 'CONDITIONAL'),
+        ('debug-only', p10_classification('LX;', site('DEBUG_METADATA'), set(), set(), True)[0], 'ANNOTATION-METADATA'),
+    ]
+    for case, reader in [('reject-non-dex', lambda: p10_dex(b'not-a-dex', {})),
+                         ('reject-non-classfile', lambda: p10_classfile(b'not-a-classfile'))]:
+        try:
+            reader()
+        except AssertionError:
+            cases.append((case, 'REJECTED', 'REJECTED'))
+        else:
+            raise AssertionError('P10 invalid diagnostic input accepted: ' + case)
+    for case, actual, expected in cases: assert actual == expected, (case, actual, expected)
+    return dict(status='PASS', cases=[dict(case=c, result='PASS', expected=e) for c, _, e in cases],
+                acceptanceChanged=False, note='Classification controls, not runtime tests')
+
+
+def p10_closure(phase):
+    controls = p10_negative_controls()
+    output = REPORT / ('p10-' + phase); output.mkdir(exist_ok=True)
+    documents, manifest = [], []
+    for kind, directory in [('target', 'release'), ('test', 'androidTest/release')]:
+        apks = list((HARNESS / 'build/outputs/apk' / directory).glob('*.apk')); assert len(apks) == 1
+        apk = apks[0]; apk_hash = sha(apk.read_bytes())
+        with zipfile.ZipFile(apk) as archive:
+            for entry in archive.namelist():
+                if not re.fullmatch(r'classes\d*\.dex', entry): continue
+                source = dict(apk=kind, path=str(apk.relative_to(ROOT)), apkSha256=apk_hash, entry=entry)
+                document = p10_dex(archive.read(entry), source); documents.append(document)
+                file = output / (kind + '-' + entry + '.json'); file.write_text(json.dumps(document, indent=2) + '\n')
+                manifest.append(dict(path=str(file.relative_to(ROOT)), sha256=sha(file.read_bytes())))
+    definitions, sites = {}, {}
+    for document in documents:
+        for name, info in document['definitions'].items():
+            definitions.setdefault(name, []).append(dict(source=document['source'], dexSha256=document['dexSha256'], **info))
+        for ref in document['references']:
+            sites.setdefault(ref['type'], []).append(dict(source=document['source'], dexSha256=document['dexSha256'], **ref))
+    inputs_path = REPORT / 'p06-r8-inputs.json'; inputs = json.loads(inputs_path.read_text())
+    resolution = json.loads((REPORT / 'p08-classpaths.json').read_text())['graphs']
+    jars, library_index, boot, unindexed = {}, {}, set(), []
+    for role in ['referencedClasses', 'programClasses', 'bootClasspath']:
+        for row in inputs[role]:
+            path = pathlib.Path(row['path'])
+            if not path.is_file() or path.suffix != '.jar':
+                unindexed.append(dict(role=role, path=str(path), reason='NOT_JAR_NOT_INDEXED; actual program DEX still decoded'))
+                continue
+            assert sha(path.read_bytes()) == row['sha256'], 'P10 input hash changed after R8 observation'
+            jars[str(path)] = row
+            with zipfile.ZipFile(path) as archive:
+                for entry in archive.namelist():
+                    if not entry.endswith('.class') or entry.startswith('META-INF/versions/'): continue
+                    name = 'L' + entry[:-6] + ';'
+                    if role == 'bootClasspath': boot.add(name)
+                    else:
+                        coordinate = re.search(r'/files-2\.1/([^/]+)/([^/]+)/([^/]+)/', str(path))
+                        component = ':'.join(coordinate.groups()) if coordinate else None
+                        scopes = [g['scope'] for g in resolution if component and any(
+                            ':'.join(c[k] for k in ['group', 'name', 'version']) == component for c in g['components'])]
+                        library_index.setdefault(name, []).append(dict(role=role, path=str(path), jarSha256=row['sha256'], entry=entry,
+                            componentFromCachePath=component, resolvedScopes=scopes,
+                            componentOrigin='MAVEN_CACHE_PATH' if component else 'TRANSFORM_COORDINATE_NOT_VERIFIED'))
+    observed, frames, crash_files = set(), [], []
+    for filename in ['p07/after-crash-logcat.stdout.log', 'p07/after-runner-logcat.stdout.log']:
+        path = REPORT / filename
+        if not path.exists(): continue
+        raw = path.read_bytes(); text = raw.decode('utf-8', errors='replace')
+        crash_files.append(dict(path=str(path.relative_to(ROOT)), sha256=sha(raw)))
+        pids = set(re.findall(r'Process: com\.app\.moneymate\.b2g2, PID: (\d+)', text))
+        # Filter exception evidence by the actual harness PID; unrelated system crashes cannot seed REQUIRED.
+        text = '\n'.join(line for line in text.splitlines() if re.match(
+            r'^\S+\s+\S+\s+(' + '|'.join(sorted(pids)) + r')\s', line)) if pids else ''
+        observed.update(re.findall(r'Failed resolution of: (L[^;]+;)', text))
+        observed.update('L' + name.replace('.', '/') + ';' for name in re.findall(r'ClassNotFoundException: ([\w.$]+)', text))
+        frames.extend(dict(owner='L' + c.replace('.', '/') + ';', name=n, line=int(line))
+                      for c, n, line in re.findall(r'\bat ([\w.$]+)\.([\w$<>]+)\([^\n():]+:(\d+)\)', text))
+    frames = [dict(owner=o, name=n, line=l) for o, n, l in sorted({(f['owner'], f['name'], f['line']) for f in frames})]
+    required = set(observed); structural, required_reasons, headers = set(), {}, {}
+    def header(name):
+        if name in headers: return headers[name]
+        providers = library_index.get(name, [])
+        bodies = []
+        for provider in providers:
+            with zipfile.ZipFile(provider['path']) as archive: body = p10_classfile(archive.read(provider['entry']))
+            bodies.append(dict(source=provider, **body))
+        headers[name] = bodies; return bodies
+    def member_definitions(name, signature):
+        queue, seen, found = [name], set(), []
+        while queue:
+            current = queue.pop(0)
+            if current in seen: continue
+            seen.add(current)
+            for body in header(current):
+                for category in ['methods', 'fields']:
+                    for declaration in body[category]:
+                        candidate = declaration['name'] + (':' if category == 'fields' else '') + declaration['descriptor']
+                        if candidate == signature:
+                            found.append(dict(declaringClass=current, declaration=declaration,
+                                              source=body['source'], classSha256=body['classSha256']))
+                if body['superclass']: queue.append(body['superclass'])
+                queue.extend(body['interfaces'])
+        return found
+    # Only unambiguous selected classfile hierarchies seed REQUIRED closure.
+    queue = list(required)
+    while queue:
+        name = queue.pop(0); bodies = header(name)
+        shapes = {(b['superclass'], tuple(b['interfaces'])) for b in bodies}
+        if len(shapes) != 1: continue
+        parent, interfaces = next(iter(shapes))
+        for dependency in [parent, *interfaces]:
+            if dependency and dependency not in definitions and dependency not in boot and dependency not in required:
+                required.add(dependency); structural.add(dependency); queue.append(dependency)
+                required_reasons[dependency] = dict(fromClass=name, kind='SELECTED_CLASSFILE_HIERARCHY')
+    # Crash line + unique new-instance of a class with the failed superclass is additional evidence,
+    # not a generic claim that every allocation/branch in a stack-frame method executed.
+    allocation_evidence = []
+    for frame in frames:
+        matching = [r for group in sites.values() for r in group if r['owner'] == frame['owner']
+                    and r['member'].split('(')[0] == ('<init>' if frame['name'] == '<init>' else frame['name'])
+                    and r['dexLine'] == frame['line'] and r['kind'] == 'NEW_INSTANCE']
+        unique = {r['type'] for r in matching}
+        if len(unique) != 1: continue
+        allocated = next(iter(unique)); infos = definitions.get(allocated, [])
+        if len(infos) != 1 or infos[0]['superclass'] not in observed: continue
+        allocation_evidence.append(dict(frame=frame, allocatedClass=allocated, sites=matching))
+        for dependency in infos[0]['interfaces']:
+            if dependency not in definitions and dependency not in boot:
+                structural.add(dependency); required_reasons[dependency] = dict(fromClass=allocated, kind='UNIQUE_CRASH_LINE_ALLOCATION_INTERFACE')
+    # Static program invoke graph: paths are potential paths, not executed traces.
+    nodes = {owner + '->' + method for owner, infos in definitions.items() for info in infos for method in info['methods']}
+    edges = {}
+    for group in sites.values():
+        for ref in group:
+            if not ref['kind'].startswith('INVOKE_') or ref['kind'].endswith('_SIGNATURE'): continue
+            source = ref['owner'] + '->' + ref['member']; target = ref['type'] + '->' + ref['referencedMember']
+            if target in nodes: edges.setdefault(source, set()).add(target)
+    roots = sorted(n for n in nodes if n.startswith('Landroidx/test/runner/AndroidJUnitRunner;->onCreate('))
+    paths = {root: [root] for root in roots}; queue = list(roots)
+    while queue:
+        node = queue.pop(0)
+        for target in sorted(edges.get(node, [])):
+            if target not in paths: paths[target] = paths[node] + [target]; queue.append(target)
+    candidates = sorted((set(sites) - set(definitions) - boot) | observed | structural)
+    mappings = {}
+    for kind, variant in [('target', 'release'), ('test', 'releaseAndroidTest')]:
+        root = HARNESS / 'build/outputs/mapping' / variant
+        mapping = (root / 'mapping.txt').read_text(); usage = (root / 'usage.txt').read_text()
+        mappings[kind] = dict(mapping=mapping, usage=usage,
+            files=[dict(path=str((root / f).relative_to(ROOT)), sha256=sha((root / f).read_bytes())) for f in ['mapping.txt', 'usage.txt']])
+    rows = []
+    for name in candidates:
+        refs = sites.get(name, []); providers = library_index.get(name, [])
+        category, reason = p10_classification(name, refs, observed, structural, bool(providers))
+        body = header(name) if providers else []
+        references = []
+        for ref in refs:
+            node = ref['owner'] + '->' + ref['member']
+            primary_member = ref['kind'].startswith(('INVOKE_', 'FIELD_ACCESS_')) and not ref['kind'].endswith('_SIGNATURE')
+            references.append(dict(**ref, potentialRunnerPath=paths.get(node), pathKind='STATIC_DIRECT_INVOKES_NOT_EXECUTION_PROOF',
+                selectedLibraryMemberDefinitions=member_definitions(name, ref['referencedMember']) if primary_member else []))
+        r8 = {}
+        original = name[1:-1].replace('/', '.')
+        for kind, evidence in mappings.items():
+            match = re.search(r'^' + re.escape(original) + r' -> ([^\s]+):$', evidence['mapping'], re.M)
+            r8[kind] = dict(mappingName=match.group(1) if match else None,
+                            mappedDefinitionPresent=('L' + match.group(1).replace('.', '/') + ';' in definitions) if match else False,
+                            usageLines=[l for l in evidence['usage'].splitlines() if l == original or l == original + ':'],
+                            sources=evidence['files'])
+        rows.append(dict(type=name, classification=category, reason=reason, requirementEvidence=required_reasons.get(name),
+                         programDefinitions=definitions.get(name, []), references=references,
+                         r8=r8, inputProviders=providers, selectedClassfileABI=body,
+                         providerAmbiguous=len({b['classSha256'] for b in body}) > 1,
+                         missingMemberProof='CLASS_MISSING; library declarations/CP symbols are expectations, not execution'))
+    # javap disassembles selected JARs read-only, preserving per-library-method code evidence.
+    # Classfile CP symbols above remain explicitly non-execution evidence.
+    javap_groups = {}
+    for row in rows:
+        if row['classification'] == 'REQUIRED' or any(r['potentialRunnerPath'] for r in row['references']):
+            providers = row['inputProviders']
+            if len({p['jarSha256'] for p in providers}) == 1 and providers:
+                javap_groups.setdefault(providers[0]['path'], set()).add(row['type'][1:-1].replace('/', '.'))
+            for ref in row['references']:
+                if not ref['potentialRunnerPath'] and row['classification'] != 'REQUIRED': continue
+                for declaration in ref['selectedLibraryMemberDefinitions']:
+                    javap_groups.setdefault(declaration['source']['path'], set()).add(
+                        declaration['declaringClass'][1:-1].replace('/', '.'))
+    javap = []
+    for index, (jar, names) in enumerate(sorted(javap_groups.items())):
+        label = 'p10-' + phase + '-javap-' + str(index)
+        java_tool = str(pathlib.Path(os.environ['JAVA_HOME']) / 'bin/javap') if os.environ.get('JAVA_HOME') else 'javap'
+        p07_command(label, [java_tool, '-p', '-s', '-c', '-classpath', jar, *sorted(names)], timeout=30)
+        result = json.loads((REPORT / 'p07/commands.json').read_text())[-1]
+        javap.append(dict(jar=jar, jarSha256=sha(pathlib.Path(jar).read_bytes()), classes=sorted(names),
+                          commandsManifest=str((REPORT / 'p07/commands.json').relative_to(ROOT)), label=label,
+                          status=result['status'], exit=result['exit']))
+    graph = REPORT / 'p08-classpaths.json'
+    errors = [dict(source=d['source'], **e) for d in documents for e in d['decodeErrors']]
+    report = dict(authority='Issue16 comment6360661190', phase=phase, diagnosticOnly=True,
+                  acceptanceChanged=False, status='COLLECTED' if not errors and all(j['status'] == 'OBSERVED' for j in javap) else 'PARTIAL_NOT_VERIFIED',
+                  source=json.loads((REPORT / 'source.json').read_text()), negativeControls=controls,
+                  dexReports=manifest, decodeErrors=errors, crashEvidence=crash_files,
+                  observedMissingClasses=sorted(observed), crashFrames=frames, allocationEvidence=allocation_evidence,
+                  selectedLibraryDisassembly=javap, unindexedR8Inputs=unindexed,
+                  crossApkClassCollisions={n: ds for n, ds in definitions.items() if len(ds) > 1},
+                  runnerRoots=roots, reachableProgramMethods=len(paths),
+                  callGraphKind='DIRECT_INVOKE_TARGETS_ONLY_NO_VIRTUAL_DISPATCH_OR_BRANCH_PROOF',
+                  programClassCounts={d['source']['apk']: len(d['definitions']) for d in documents},
+                  bootDefinitionScope='COMPILE_SDK_BOOT_JAR_NOT_DEVICE_RUNTIME_PROOF',
+                  resolvedGraph=dict(path=str(graph.relative_to(ROOT)), sha256=sha(graph.read_bytes())),
+                  r8Inputs=dict(path=str(inputs_path.relative_to(ROOT)), sha256=sha(inputs_path.read_bytes())),
+                  candidates=rows, counts={c: sum(r['classification'] == c for r in rows)
+                      for c in ['REQUIRED', 'CONDITIONAL', 'ANNOTATION-METADATA', 'UNKNOWN']},
+                  note='No keep/dependency proposal is applied. Conditional/metadata/unknown are not blanket runtime requirements.')
+    path = output / 'closure.json'; path.write_text(json.dumps(report, indent=2) + '\n')
+    lines = ['| Class | Classification | Reference sites | Runner path sites | Library providers |', '|---|---|---:|---:|---:|']
+    for row in rows:
+        lines.append('| ' + row['type'] + ' | ' + row['classification'] + ' | ' + str(len(row['references'])) + ' | '
+                     + str(sum(bool(r['potentialRunnerPath']) for r in row['references'])) + ' | ' + str(len(row['inputProviders'])) + ' |')
+    (output / 'closure.md').write_text('\n'.join(lines) + '\n\nFull per-member/source/hash evidence: closure.json and DEX reports. Static paths are not execution traces.\n')
+
 
 
 def inspect():

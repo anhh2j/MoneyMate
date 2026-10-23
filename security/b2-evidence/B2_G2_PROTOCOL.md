@@ -390,3 +390,82 @@ nội bộ, apksigner/aapt và license collector vẫn ngoài P09. Chưa tới g
 failure phải giữ FAIL, không suy từ P07/P08 hay CI nền. QA kiểm toán độc lập trước Leader
 nghiệm thu. PR17/18 Draft, không Ready/merge/tag/release/T20 production; ARM64 thực,
 ARM64-16KiB thực và native OOM OPEN.
+
+## G2-P10 — diagnostic shared-runtime closure, không sửa runtime
+
+Thẩm quyền PO6360661190, Leader6360644936, QA6360610821 (23/10/2026).
+Delta chỉ inspector và protocol. Giữ đúng12 path, metadata796/cấu hình strict, catalog,
+build/dependencies/constraints, P08 keep rules, AGP9.4.1/Kotlin2.4.21, source/test/KAT,
+runner args/task wiring/workflow/manifest/permissions/root/production/QA/version.
+Không tạo APK mới ngoài build acceptance cũ, không rewrite/sign/install thêm, không sửa
+R8 input hay gọi instrumentation khác. Hai hook p07_safe chỉ thu diagnostic sau build/
+scans và sau snapshot/runtime observation cũ; lỗi collector ghi NOT-VERIFIED, không
+thay kết quả acceptance, không waive5 tests/20 metrics hoặc clear-logcat.
+
+Collector tạo `build/reports/b2-g2/p10-build/` và `p10-runtime/` bằng dữ liệu thực tại
+cùng HEAD. `closure.json` + `closure.md` có per-class/per-member sites, PC/dòng debug,
+source APK/DEX/JAR hashes, graph/input manifest hashes, mapping/usage và taxonomy.
+Các `target-classes*.dex.json`/`test-classes*.dex.json` ghi toàn bộ class definitions,
+superclass/interfaces, declared field/method signatures/flags và references được giải
+mã từ invoke, field access, new-instance/type instructions, catch types, annotation,
+debug metadata/static encoded values. Không coi method_ids/type_ids là definitions.
+
+DEX parser độc lập theo format AOSP, hỗ trợ header112/little-endian; instruction width
+table đối chiếu dex_instruction_list.h của AOSP (decoded source SHA256
+6dec605fb0d44317eb8534fe7c186d6d0fdeb651375f618de5a929f76d60ef45):
+https://android.googlesource.com/platform/art/+/refs/heads/main/libdexfile/dex/dex_instruction_list.h
+https://source.android.com/docs/core/runtime/dalvik-bytecode
+https://source.android.com/docs/core/runtime/dex-format
+Không fetch spec/table trong CI. Payloads, invoke-polymorphic/custom, method handles và
+annotation encoded values được xử lý riêng. Opcode/container không hỗ trợ hoặc decode
+lỗi ghi coverage PARTIAL/NOT-VERIFIED, không đoán reference. Descriptor strings trong
+Kotlin Metadata không tự biến thành runtime type use. 9 classification controls chặn
+nhầm static invoke/signature/annotation/type-pool/provider-unknown thành observed need;
+thêm2 format controls từ chối non-DEX/non-classfile, tổng11 controls diagnostic.
+
+Định nghĩa classification:
+- REQUIRED: missing class trong crash của đúng PID harness, hoặc superclass/interface
+  closure của class đó từ selected JAR có hierarchy không mâu thuẫn. Đây là class linkage
+  requirement; member reference vẫn phải có site/declared ABI, không bịa đã được gọi.
+- CONDITIONAL: có decoded runtime-capable site/signature và provider xác định, nhưng
+  chưa có proof nhánh đó thực thi. Potential direct-invoke path không nâng thành REQUIRED.
+- ANNOTATION-METADATA: chỉ typed annotation/debug sites; không đồng nghĩa tùy ý xóa mọi
+  annotation hay khẳng định reflection không cần. VM annotation có semantics riêng.
+- UNKNOWN: chỉ type pool, không provider/use-site xác định hoặc suy luận còn thiếu.
+
+Chỉ raw harness PID exception làm seed; lỗi system process không được seed REQUIRED.
+`build` chưa có runtime crash của run này nên không mượn seed từ P09. Sau runtime, giữ
+raw log hash và stack frames. Chỉ khi dòng crash ánh xạ duy nhất tới allocation có failed
+superclass mới dùng interface linkage bổ sung; không suy mọi new-instance trong stack
+frame đã chạy. Supertype closure qua classfile CP/hierarchy khác CP member symbols:
+CP symbols không phải per-method execution. Những thứ không xác định phải ghi rõ.
+
+Program definitions lấy từ cả2 actual APK DEX. So actual R8 library/program/boot inputs
+bằng SHA256 trước khi index selected JAR entries; classfile ABI lưu hash/fields/methods/
+superclass/interfaces/CP symbols, per-member lookup có inherited declarations. Maven
+cache path cho coordinate và graph membership; transformed JAR coordinate chưa xác định
+thì ghi NOT-VERIFIED, không đoán group từ filename. Non-JAR input ghi unindexed; actual
+program DEX vẫn được giải mã. Compile SDK boot JAR chỉ là static baseline, không chứng
+minh class khả dụng trên thiết bị API26/35. Class definition/mapping presence không tự
+chứng minh classloader visibility; collision giữa target/test được liệt kê riêng.
+
+Đối chiếu R8 mapping/usage giúp tách removed/renamed và stable identity bị thiếu. Selected
+JAR ABI không làm program definition xuất hiện. Với REQUIRED hoặc candidate có potential
+runner path, `javap -p -s -c` đọc selected JAR và inherited declaring class, giữ stdout/
+stderr/exit/hash trong P07 diagnostic manifest. javap không chạy class; lỗi/missing tool
+là PARTIAL, không lấy output thiếu làm proof. Không cài thêm tool/dependency.
+
+Call graph chỉ nối encoded invoke targets trùng program method definitions từ root
+AndroidJUnitRunner.onCreate; không giải đầy đủ virtual dispatch, callbacks, reflection,
+ServiceLoader, dynamic loading hay branch conditions. Path là STATIC, không phải trace.
+JNI/native và test discovery vẫn phải xác nhận runtime sau khi được duyệt sửa. Không
+mặc định35 Kotlin +4 concurrent candidates của P09 đều là runtime requirements.
+
+Đầu ra dùng để trình thiết kế keep/dependency tối thiểu có source/member proof và giới
+hạn: seed class linkage đã quan sát khác complete initialization/test closure. Không
+áp dụng keep mới, không blanket Kotlin/AndroidX, dontwarn/stub/JDK hay hạ shrink/gate.
+Nếu cần sửa ngoài2 file, dừng và xin PO duyệt phương án cụ thể. Rerun đủ4 cell để thu
+report,30 phút/cell, retention3 ngày và CI nền cùng HEAD; G2 FAIL được giữ trung thực.
+API26 logcat, permission, apksigner/aapt, license collector/legal vẫn ngoài P10. QA độc lập
+trước Leader review; PR17/18 Draft, không Ready/merge/tag/release/T20 production;
+ARM64 thực/ARM64-16KiB thực/native OOM OPEN.
