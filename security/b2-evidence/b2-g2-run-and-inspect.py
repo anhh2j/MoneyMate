@@ -1770,7 +1770,10 @@ def p12_member_line(line, owner):
         descriptor = '(' + ''.join(p12_java_type(p) for p in params.split(',') if p) + ')' + p12_java_type(result)
         return dict(kind='METHOD', name=name, descriptor=descriptor, originalOwner=declaring)
     match = re.fullmatch(r'(\S+)\s+(\S+)', line); assert match, 'Unsupported mapping field: ' + line
-    return dict(kind='FIELD', name=match[2], descriptor=p12_java_type(match[1]), originalOwner=owner)
+    name, declaring = match[2], owner
+    if '.' in name:
+        declaring, name = name.rsplit('.', 1); declaring = p12_java_type(declaring)
+    return dict(kind='FIELD', name=name, descriptor=p12_java_type(match[1]), originalOwner=declaring)
 
 
 def p12_mapping(text, usage):
@@ -1890,6 +1893,8 @@ def p12_negative_controls():
     check('mapping-field-rename-distinct-from-removal', mapping['members'][0]['mappedName'] == 'a' and mapping['removed'][0]['name'] == 'gone')
     check('mapped-method-array-prototype', mapping['members'][1]['descriptor'] == '([I)V')
     check('class-map-not-member-map', not any(m['name'] == 'gone' for m in mapping['members']))
+    moved = p12_mapping('a.A -> q:\n    int other.Owner.item -> a\n', '')['members'][0]
+    check('qualified-field-owner-is-provenance', moved['name'] == 'item' and moved['originalOwner'] == 'Lother/Owner;' and moved['inlinedFromOtherOwner'])
     renamed = {'Lq;': body({'a:I': 9})}
     check('stale-renamed-reference-unresolved', not lookup('Lq;', 'live:I', 'FIELD', renamed)['matches'])
     check('renamed-live-definition-present', bool(lookup('Lq;', 'a:I', 'FIELD', renamed)['matches']))

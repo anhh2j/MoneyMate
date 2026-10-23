@@ -576,7 +576,7 @@ Theo PO6368999821/Leader6368952905, delta chỉ inspector/protocol trên mốc P
 metadata796/catalog/dependencies/toolchain/test/KAT/runner/workflow/gate/production.
 
 Collector `p12-build/` và `p12-runtime/` sinh `members.json` + `members.md`, source/hash
-manifest và27 controls. Hai hook dùng safe diagnostic wrapper sau build/oracle và
+manifest và28 controls. Hai hook dùng safe diagnostic wrapper sau build/oracle và
 sau instrumentation/P10; không thay exit/acceptance cũ. API26 lỗi clear-logcat vẫn
 dừng trước instrumentation, chỉ có build report. CI nền phải cùng HEAD,4 cell tối đa
 30 phút/cell, retention3 ngày; QA độc lập trước Leader review, PR17/18 giữ Draft.
@@ -632,12 +632,15 @@ khác nhau ghi ambiguity. Non-JAR inputs ghi unindexed, actual final program DEX
 decode đầy đủ. Classfile ABI/CP không phải per-method execution. Report có mapping/
 usage/input/DEX/APK/XML hashes và table coverage để QA kiểm toán từng row.
 
-27 controls kiểm class-only khác member proof, exact overload/descriptor, inheritance
+28 controls kiểm class-only khác member proof, exact overload/descriptor, inheritance
 field/method và interface precedence, constructor không inherited, incomplete owner/
 parent, static-kind, member rename khác removal/class-map, array/obfuscated descriptor,
 tên member chứa L, malformed mapping, stale/live renamed references, ambiguous interfaces,
 clinit không inherited và taxonomy observed/static/annotation/ID-only.
 Thêm2 controls cho selected-library facade inherited ABI và constructor không inherited.
+Qualified synthetic field labels tách declaring owner/name; source owner khác mapping
+header giữ như moved/inline provenance, không giả thành direct field rename. Có control
+riêng để chặn diễn giải nguyên chuỗi `other.Owner.field` như tên field JVM.
 Selected provider ABI lookup theo cả superclass/interfaces, ghi declaringClass/hash;
 không kết luận thiếu provider member chỉ vì facade không tự khai báo method đó.
 Controls chỉ trên dữ liệu synthetic, không mutate APK/input/source hay gate.
