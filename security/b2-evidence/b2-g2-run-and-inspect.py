@@ -20,6 +20,13 @@ REPORT = HARNESS / 'build/reports/b2-g2'
 BASE = '690a74af29897d43fcb9f4c58808ae6ea2e3365f'
 ACCEPTED_B2 = 'be26d275d621c4a0c64ed9dd5fb89cad42bf91b2'
 P05_CATALOG_ALIAS = b'b2-errorprone-annotations = { module = "com.google.errorprone:error_prone_annotations", version = "2.36.0" }\n'
+P08_CATALOG_ALIAS = b'b2-tracing = { module = "androidx.tracing:tracing", version = "1.1.0" }\n'
+P08_GRAPH_HASHES = {
+    'releaseAndroidTestCompileClasspath': '5fd6ba7f9c09d4ad3ce4be5ef9c44c6947d9be107920de5713c54a47ffc2c6c5',
+    'releaseAndroidTestRuntimeClasspath': '08b586c85acdeed027245c7d7f1c4b600feeef16726ab45d61591c0894349f11',
+    'releaseRuntimeClasspath': 'e08b8b91403b633f1f60198df3a221d51cfe40d4186628c1c9181f9e1f760d59',
+}
+P08_TRACE_METHODS = {'beginSection(Ljava/lang/String;)V', 'endSection()V', 'forceEnableAppTracing()V'}
 P05_CLASSES = ['com.google.errorprone.annotations.CanIgnoreReturnValue', 'com.google.errorprone.annotations.MustBeClosed']
 # G2-P01: Leader6354820006, official PO authorization6355498984.
 # G2-P03: official PO authorization6356299057; only the final metadata record.
@@ -100,11 +107,11 @@ def verify_metadata(raw):
 def approved_catalog():
     baseline = subprocess.check_output(['git', 'show', ACCEPTED_B2 + ':gradle/libs.versions.toml'], cwd=ROOT)
     assert baseline.count(b'[libraries]\n') == 1
-    return baseline.replace(b'[libraries]\n', b'[libraries]\n' + P05_CATALOG_ALIAS, 1)
+    return baseline.replace(b'[libraries]\n', b'[libraries]\n' + P05_CATALOG_ALIAS + P08_CATALOG_ALIAS, 1)
 
 
 def verify_catalog(raw):
-    assert raw == approved_catalog(), 'STOP: catalog differs from baseline plus exact P05 alias'
+    assert raw == approved_catalog(), 'STOP: catalog differs from baseline plus exact P05/P08 aliases'
 
 
 def catalog_negative_controls(raw):
@@ -115,6 +122,10 @@ def catalog_negative_controls(raw):
         'baseline-version-drift': raw.replace(b'agp = "9.4.1"', b'agp = "9.4.0"'),
         'extra-alias': raw + b'\nunapproved = { id = "synthetic.plugin", version = "1" }\n',
         'alias-renamed': raw.replace(b'b2-errorprone-annotations =', b'b2-unapproved-annotations ='),
+        'p08-alias-missing': raw.replace(P08_CATALOG_ALIAS, b''),
+        'p08-version-drift': raw.replace(P08_CATALOG_ALIAS, P08_CATALOG_ALIAS.replace(b'1.1.0', b'1.2.0')),
+        'p08-alias-renamed': raw.replace(b'b2-tracing =', b'b2-unapproved-tracing ='),
+        'p08-alias-duplicate': raw + P08_CATALOG_ALIAS,
     }
     results = []
     for name, value in controls.items():
@@ -199,12 +210,13 @@ def preflight():
     catalog = (HARNESS / 'gradle/libs.versions.toml').read_bytes()
     verify_catalog(catalog)
     catalog_negative_controls(catalog)
-    write_json('catalog-policy.json', {'authority': 'Issue16 comment6357366408', 'acceptedB2': ACCEPTED_B2,
+    write_json('catalog-policy.json', {'authority': 'Issue16 comment6359936855', 'acceptedB2': ACCEPTED_B2,
                                        'baselineSha256': sha(reference), 'catalogSha256': sha(catalog),
-                                       'approvedInsertion': P05_CATALOG_ALIAS.decode().strip()})
+                                       'approvedInsertions': [P05_CATALOG_ALIAS.decode().strip(), P08_CATALOG_ALIAS.decode().strip()]})
     metadata = (HARNESS / 'gradle/verification-metadata.xml').read_bytes()
     verify_metadata(metadata)
     guard_negative_controls(metadata)
+    p08_negative_controls()
     write_json('checksum-policy.json', {'baselineArtifactRecords': 784, 'approvedAdditions': APPROVED_CHECKSUMS,
                                        'p01Additions': 10, 'p03Additions': 1, 'totalArtifactRecords': 795,
                                        'metadataSha256': sha(metadata), 'strictVerification': True})
@@ -235,6 +247,9 @@ def build():
     finally:
         if (REPORT / 'p06-r8-inputs.json').exists():
             verify_test_resolution()
+        if (REPORT / 'p08-classpaths.json').exists():
+            verify_p08_graphs()
+    verify_p08_apks()
     gradle('target-dependencies', ':dependencies', '--configuration', 'releaseRuntimeClasspath')
     gradle('test-dependencies', ':dependencies', '--configuration', 'releaseAndroidTestRuntimeClasspath')
     gradle('test-errorprone-insight', ':dependencyInsight', '--dependency', 'com.google.errorprone:error_prone_annotations',
@@ -308,7 +323,8 @@ gradle.taskGraph.beforeTask { task ->
     if (task.project.rootProject.name != 'MoneyMate-B2-G2-Test-Only' || task.path != ':minifyReleaseAndroidTestWithR8') return
     def output = new File(task.project.rootProject.projectDir, 'build/reports/b2-g2')
     output.mkdirs()
-    def scopes = ['releaseAndroidTestCompileClasspath', 'releaseAndroidTestRuntimeClasspath', 'releaseRuntimeClasspath']
+    def scopes = ['releaseAndroidTestCompileClasspath', 'releaseAndroidTestRuntimeClasspath', 'releaseRuntimeClasspath',
+                  'releaseCompileClasspath']
     def graphs = scopes.collect { scope ->
         def configuration = task.project.configurations.getByName(scope)
         def result = configuration.incoming.resolutionResult
@@ -320,7 +336,9 @@ gradle.taskGraph.beforeTask { task ->
             [from: it.from.id.displayName, requested: it.requested.displayName, selected: it.selected.id.displayName]
         }]
     }
-    new File(output, 'p06-classpaths.json').text = JsonOutput.toJson([graphs: graphs, capturedBeforeTask: task.path])
+    new File(output, 'p06-classpaths.json').text = JsonOutput.toJson([
+        graphs: graphs.findAll { it.scope != 'releaseCompileClasspath' }, capturedBeforeTask: task.path])
+    new File(output, 'p08-classpaths.json').text = JsonOutput.toJson([graphs: graphs, capturedBeforeTask: task.path])
     def evidence = [task: task.path, taskType: task.class.name, stage: 'BEFORE_TEST_R8', status: 'NOT-VERIFIED',
                     mutatesTaskInputs: false]
     try {
@@ -358,6 +376,82 @@ def validate_p06_inputs(graphs, inputs):
     assert any(row['sha256'] == '77440e270b0bc9a249903c5a076c36a722c4886ca4f42675f2903a1c53ed61a5'
                and all(name.replace('.', '/') + '.class' in row['errorProneClasses'] for name in P05_CLASSES)
                for row in library_rows), 'Pinned Error Prone JAR not observed as R8 library input'
+
+
+def validate_p08_graphs(graphs):
+    expected = set(P08_GRAPH_HASHES) | {'releaseCompileClasspath'}
+    assert len(graphs) == 4 and {g['scope'] for g in graphs} == expected, 'STOP P08: incomplete compile/runtime graphs'
+    rows_by_scope = {}
+    for graph in graphs:
+        versions = {c['version'] for c in graph['components']
+                    if c['group'] == 'androidx.tracing' and c['name'] == 'tracing'}
+        assert versions == {'1.1.0'}, f"STOP P08: {graph['scope']} tracing {versions}"
+        rows = sorted(':'.join(c[k] for k in ['group', 'name', 'version']) for c in graph['components']
+                      if c['group'] != 'androidx.tracing' or c['name'] != 'tracing')
+        rows_by_scope[graph['scope']] = set(rows)
+        if graph['scope'] in P08_GRAPH_HASHES:
+            assert sha('\n'.join(rows).encode()) == P08_GRAPH_HASHES[graph['scope']], 'STOP P08: non-tracing graph drift'
+    admitted = set().union(*(rows_by_scope[scope] for scope in P08_GRAPH_HASHES))
+    assert rows_by_scope['releaseCompileClasspath'] <= admitted, 'STOP P08: unexpected target compile component'
+
+
+def verify_p08_graphs():
+    graphs = json.loads((REPORT / 'p08-classpaths.json').read_text())['graphs']
+    validate_p08_graphs(graphs)
+    controls = {}
+    for case in ['runtime-downgrade', 'test-compile-missing', 'target-compile-missing', 'non-tracing-drift']:
+        modified = json.loads(json.dumps(graphs))
+        scope = 'releaseAndroidTestRuntimeClasspath' if case == 'runtime-downgrade' else 'releaseAndroidTestCompileClasspath'
+        graph = next(g for g in modified if g['scope'] == scope)
+        if case == 'runtime-downgrade':
+            next(c for c in graph['components'] if c['group'] == 'androidx.tracing')['version'] = '1.0.0'
+        elif case == 'test-compile-missing':
+            graph['components'] = [c for c in graph['components'] if c['group'] != 'androidx.tracing']
+        elif case == 'target-compile-missing':
+            modified = [g for g in modified if g['scope'] != 'releaseCompileClasspath']
+        else:
+            graph['components'].append({'group': 'synthetic.unapproved', 'name': 'drift', 'version': '0'})
+        try:
+            validate_p08_graphs(modified)
+        except AssertionError:
+            controls[case] = 'REJECTED'
+        else:
+            raise AssertionError('P08 graph negative control accepted: ' + case)
+    write_json('p08-resolution.json', {
+        'authority': 'Issue16 comment6359936855', 'status': 'PASS', 'tracingVersion': '1.1.0',
+        'scopes': [g['scope'] for g in graphs], 'graphSha256': sha((REPORT / 'p08-classpaths.json').read_bytes()),
+        'p07NonTracingComponentHashes': P08_GRAPH_HASHES, 'negativeControls': controls,
+        'note': 'Target compile is additionally observed; three pre-existing scope component sets match P07 excluding tracing.',
+    })
+
+
+def validate_p08_apk_facts(facts):
+    assert facts['traceTargetDefinition'] is True, 'STOP P08: no stable Trace target DEX definition'
+    assert facts['traceTestDefinition'] is False, 'STOP P08: duplicate Trace test definition'
+    assert set(facts['targetPublicStaticMethods']) >= P08_TRACE_METHODS, 'STOP P08: missing shared Trace API definition'
+    assert facts['canaryRemoved'] is True and facts['r8Executed'] is True, 'STOP P08: R8/canary not verified'
+
+
+def p08_negative_controls():
+    valid = {'traceTargetDefinition': True, 'traceTestDefinition': False,
+             'targetPublicStaticMethods': sorted(P08_TRACE_METHODS), 'canaryRemoved': True, 'r8Executed': True}
+    validate_p08_apk_facts(valid)
+    mutations = {
+        'missing-target-trace': dict(valid, traceTargetDefinition=False),
+        'duplicate-test-trace': dict(valid, traceTestDefinition=True),
+        'missing-force-enable-api': dict(valid, targetPublicStaticMethods=['beginSection(Ljava/lang/String;)V', 'endSection()V']),
+        'canary-retained': dict(valid, canaryRemoved=False),
+        'r8-not-executed': dict(valid, r8Executed=False),
+    }
+    rows = []
+    for case, facts in mutations.items():
+        try:
+            validate_p08_apk_facts(facts)
+        except AssertionError:
+            rows.append({'case': case, 'result': 'REJECTED'})
+        else:
+            raise AssertionError('P08 APK negative control accepted: ' + case)
+    write_json('p08-negative-controls.json', {'status': 'PASS', 'controls': rows, 'sourceFilesMutated': False})
 
 
 def verify_test_resolution():
@@ -691,6 +785,7 @@ def instrument():
         command('device-memory-after', ['adb', 'shell', 'dumpsys', 'meminfo'], required=False)
         p07_safe('after', lambda: p07_snapshot('after'))
         p07_safe('results', p07_result_index)
+        p08_runtime_observation()
 
 
 def dex_classes(raw):
@@ -714,10 +809,120 @@ def apk_classes(path):
         return set().union(*(dex_classes(archive.read(n)) for n in archive.namelist() if n.endswith('.dex')))
 
 
+def dex_public_static_definitions(raw, descriptor):
+    """Read encoded class_data definitions, not merely method_ids references."""
+    assert raw[:4] == b'dex\n'
+    u32 = lambda offset: struct.unpack_from('<I', raw, offset)[0]
+
+    def uleb(offset):
+        value, shift = 0, 0
+        while True:
+            byte = raw[offset]
+            offset += 1
+            value |= (byte & 127) << shift
+            if not byte & 128:
+                return value, offset
+            shift += 7
+            assert shift < 35, 'Invalid DEX ULEB128'
+
+    strings = []
+    for index in range(u32(56)):
+        offset = u32(u32(60) + index * 4)
+        _, offset = uleb(offset)
+        strings.append(raw[offset:raw.index(b'\x00', offset)].decode('utf-8', errors='replace'))
+    types = [strings[u32(u32(68) + index * 4)] for index in range(u32(64))]
+    found = set()
+    for index in range(u32(96)):
+        entry = u32(100) + index * 32
+        if types[u32(entry)] != descriptor:
+            continue
+        offset = u32(entry + 24)
+        if not offset:
+            continue
+        sizes = []
+        for _ in range(4):
+            value, offset = uleb(offset)
+            sizes.append(value)
+        for _ in range(sizes[0] + sizes[1]):
+            _, offset = uleb(offset)
+            _, offset = uleb(offset)
+        for count in sizes[2:]:
+            method_index = 0
+            for _ in range(count):
+                delta, offset = uleb(offset)
+                flags, offset = uleb(offset)
+                _, offset = uleb(offset)
+                method_index += delta
+                owner, prototype, name = struct.unpack_from('<HHI', raw, u32(92) + method_index * 8)
+                assert types[owner] == descriptor
+                if flags & 9 != 9:
+                    continue
+                _, result, parameters = struct.unpack_from('<III', raw, u32(76) + prototype * 12)
+                arguments = '' if not parameters else ''.join(
+                    types[struct.unpack_from('<H', raw, parameters + 4 + parameter * 2)[0]]
+                    for parameter in range(u32(parameters)))
+                found.add(strings[name] + '(' + arguments + ')' + types[result])
+    return found
+
+
+def verify_p08_apks():
+    targets = list((HARNESS / 'build/outputs/apk/release').glob('*.apk'))
+    tests = list((HARNESS / 'build/outputs/apk/androidTest/release').glob('*.apk'))
+    assert len(targets) == len(tests) == 1, 'STOP P08: missing/ambiguous APK pair'
+    target, test = targets[0], tests[0]
+    target_classes, test_classes = apk_classes(target), apk_classes(test)
+    definitions = set()
+    with zipfile.ZipFile(target) as archive:
+        for name in archive.namelist():
+            if re.fullmatch(r'classes\d*\.dex', name):
+                definitions |= dex_public_static_definitions(archive.read(name), 'Landroidx/tracing/Trace;')
+    usage = (HARNESS / 'build/outputs/mapping/release/usage.txt').read_text()
+    lines = (REPORT / 'build.log').read_text().splitlines()
+    tasks = [line for line in lines if line.startswith('> Task :minifyReleaseWithR8')
+             or line.startswith('> Task :minifyReleaseAndroidTestWithR8')]
+    facts = {
+        'traceTargetDefinition': 'Landroidx/tracing/Trace;' in target_classes,
+        'traceTestDefinition': 'Landroidx/tracing/Trace;' in test_classes,
+        'targetPublicStaticMethods': sorted(definitions),
+        'canaryRemoved': 'B2G2UnreachableCanary' in usage and not any('B2G2UnreachableCanary' in c for c in target_classes),
+        'r8Executed': len(tasks) == 2 and not any(any(flag in line for flag in ['SKIPPED', 'NO-SOURCE', 'UP-TO-DATE', 'FROM-CACHE'])
+                                              for line in tasks),
+    }
+    # Persist actual facts before assertion, including a failed R8/class/member oracle.
+    write_json('p08-trace-apks.json', {
+        'authority': 'Issue16 comment6359936855', 'facts': facts, 'r8TaskLog': tasks,
+        'targetApkSha256': sha(target.read_bytes()), 'testApkSha256': sha(test.read_bytes()),
+        'classification': 'OBSERVED_NOT_RUNTIME_ACCEPTANCE',
+    })
+    validate_p08_apk_facts(facts)
+
+
+def p08_runtime_observation():
+    totals = dict(tests=0, failures=0, errors=0, skipped=0)
+    for path in (HARNESS / 'build/outputs/androidTest-results').rglob('*.xml'):
+        for suite in ET.parse(path).getroot().iter('testsuite'):
+            for key in totals:
+                totals[key] += int(suite.get(key, 0))
+    metrics = (REPORT / 'metrics.jsonl').read_text().splitlines()
+    crash = REPORT / 'p07/after-crash-logcat.stdout.log'
+    raw = crash.read_text(errors='replace') if crash.exists() else ''
+    trace_crash = bool(re.search(r'(?:NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError).*?(?:androidx[/.]tracing|forceEnableAppTracing)', raw))
+    passed = totals == dict(tests=5, failures=0, errors=0, skipped=0) and len(metrics) == 20 and not trace_crash
+    write_json('p08-runtime-observation.json', {
+        'status': 'PASS' if passed and crash.exists() else 'FAIL', 'junit': totals, 'metricsRows': len(metrics),
+        'traceCrashObserved': trace_crash, 'crashEvidencePresent': crash.exists(),
+        'crashLogSha256': sha(crash.read_bytes()) if crash.exists() else None,
+        'note': 'Runtime observation only; all original JNI/KAT/metrics/environment/security/signature gates remain mandatory.',
+    })
+
+
 def inspect():
     verify_toolchain()
     verify_catalog((HARNESS / 'gradle/libs.versions.toml').read_bytes())
     verify_test_resolution()
+    verify_p08_graphs()
+    verify_p08_apks()
+    assert json.loads((REPORT / 'p08-runtime-observation.json').read_text())['status'] == 'PASS', 'P08 runtime observation failed'
     commands = json.loads((REPORT / 'commands.json').read_text())
     assert all(row['exit'] == 0 for row in commands if row['required'])
     assert any(row['label'] == 'instrumented' and row['exit'] == 0 for row in commands)

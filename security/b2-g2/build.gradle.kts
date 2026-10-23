@@ -43,6 +43,7 @@ kotlin { jvmToolchain(17) }
 
 dependencies {
     implementation(libs.b2.argon2kt)
+    implementation(libs.b2.tracing)
     androidTestImplementation(libs.b2.runner)
     androidTestImplementation(libs.b2.junit)
     androidTestCompileOnly(libs.b2.errorprone.annotations)

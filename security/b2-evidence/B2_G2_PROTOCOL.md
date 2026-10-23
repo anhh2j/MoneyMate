@@ -285,3 +285,67 @@ Nếu nguyên nhân cần đổi source/test/wiring/keep/workflow/allowlist: D�
 nộp phương án riêng cho PO. Chạy đủ4 cell, tối đa30 phút/cell, artifact3 ngày, CI nền
 cùng HEAD nếu có commit. QA kiểm toán độc lập. PR17/18 giữ Draft; không merge/tag/release,
 không T20 production; ARM64 thực/ARM64-16KiB thực/native OOM vẫn OPEN.
+
+## G2-P08 — shared tracing runtime sau target R8
+
+Thẩm quyền PO6359936855, Leader6359917934, QA6359881006 (23/10/2026).
+P08 thay phạm vi diagnostic-only của P07 đúng cho tracing: chỉ catalog, build của
+standalone harness, proguard-rules, inspector và protocol. Không đổi file khác trong
+12-path allowlist; giữ metadata795 byte-exact, AGP9.4.1/KGP-compiler-BTA2.4.21,
+Argon2Kt/KAT/test source, workflow, manifest/permission, production/root/QA/version.
+
+P07 raw crash logs chứng minh AndroidJUnitRunner.onCreate thiếu androidx.tracing.Trace,
+trước discovery. Test DEX còn đủ5 runtime Test annotations nhưng Trace definition vắng
+cả2 DEX. Graph compile1.1.0/runtime1.0.0 là hazard riêng. DEX method_ids thực tế của
+test APK P07 chỉ tham chiếu ba API Trace: beginSection(String), endSection(),
+forceEnableAppTracing(). Đây là cơ sở keep chính xác ba public static void member đó
+và class identity androidx.tracing.Trace, không keep cả package hay androidx.**.
+Không allowshrinking/allowobfuscation cho entry points này; helper reachability do R8
+xử lý, không blanket keep, dontwarn, tắt minify/resource shrinking hay đổi task wiring.
+
+Catalog thêm đúng một dòng sau alias P05:
+`b2-tracing = { module = "androidx.tracing:tracing", version = "1.1.0" }`.
+Build chỉ thêm implementation(libs.b2.tracing) vào target harness. Catalog guard P08
+thay exact-P05-only bằng baseline be26d275 + exact P05 + exact P08, không đổi baseline
+alias/version. Giữ5 catalog controls cũ, thêm4 tracing controls; checksum/scope8 controls
+vẫn giữ. Không thêm dependency tracing vào production hay ép constraint khác.
+
+Observer chỉ đọc trước test R8 như P06, bổ sung releaseCompileClasspath và ghi
+p08-classpaths.json đủ4 target/test compile/runtime graph; p06-classpaths.json vẫn đúng
+3 scope cũ, oracle Error Prone không thay. p08-resolution.json đòi tracing1.1.0 ở đủ4
+scope. Ba scope có baseline P07 được so hash canonical component set sau loại duy nhất
+androidx.tracing:tracing, để chặn non-tracing version/component drift. Hash gốc lấy từ
+P07 p06-classpaths.json (SHA256 4aae5c6f1d0d21deb956a2bd346b161af574fb7fbdf20e97f72881305b5983e5).
+Target compile được quan sát mới; không bịa baseline hash, chỉ chấp nhận non-tracing
+components thuộc union đã quan sát ở3 scope P07. Toolchain parity vẫn kiểm độc lập.
+4 negative controls chặn downgrade runtime, mất tracing compile, thiếu target compile
+graph và non-tracing drift. Tất cả graph evidence được ghi trước R8; validate trong
+finally kể cả build fail nếu report có tồn tại. Chưa tới observer là NOT-VERIFIED.
+
+Ngay sau build, p08-trace-apks.json ghi SHA APK, class definitions, public-static method
+definitions và R8 task/canary facts trước assertion. DEX decoder đọc encoded class_data
+để chứng minh member thật, không dùng method_ids reference làm definition. Bắt buộc
+Trace identity ở target DEX, không duplicate ở test DEX, đủ ba API nói trên, cả2 R8
+task thực thi và canary bị loại. 5 negative controls: thiếu target Trace, duplicate test,
+thiếu force-enable API, canary còn và R8 không thực thi. Build proof không phải JNI PASS.
+
+Lệnh acceptance không đổi; P07 snapshots/raw logs tiếp tục thu. Sau instrumentation,
+p08-runtime-observation.json ghi JUnit/metrics và crash-log hash: chỉ PASS khi5/0/0/0,
+20 metrics và có crash evidence không thấy lỗi Trace. Thiếu file/evidence không được
+PASS. Inspector kiểm lại graph/DEX/P08 runtime rồi vẫn chạy nguyên các gate JNI/KAT,
+metric content, page/ABI/heap/bounded-memory, R8/provider/test isolation, signature,
+zipalign/ELF/lint/security cuối. Không thay bằng Gradle exit0, build report hay mock.
+
+Tái lập dùng workflow G2 cũ với preflight/build/instrument/inspect, đủ4 cell,30 phút/cell,
+retention3 ngày, CI nền cùng HEAD. Tracing1.1.0 AAR/module đã có pin trong metadata795
+(AAR5b78e2c618fc10b3d14decc01df76158f15954ad746aacf0607766721da081f6;
+module b1fed4309623b6f20bc817d8fbd70e4ea7085e40647694cd399ae58d2f0049e3).
+Nếu artifact/checksum mới, non-tracing/toolchain drift hoặc cần sửa ngoài5 file: DỪNG,
+giữ lỗi và xin quyết định riêng, không tự thêm pin/force/keep rộng hay fallback.
+
+API26 clear-logcat vẫn required, lỗi thì dừng cell. Permission nội bộ, apksigner SDK37,
+aapt badging và license collector vẫn ngoài P08, không sửa/nới gate, không tự đánh PASS.
+License UNKNOWN/HIGH giữ nguyên. Nếu tracing qua nhưng gặp lỗi khác, ghi riêng phần
+đã chứng minh và blocker còn lại; không nghiệm thu G2 khi chưa đủ gates. QA độc lập,
+PR17/18 Draft, không Ready/merge/tag/release/T20 production; ARM64 thực/ARM64-16KiB thực/
+native OOM vẫn OPEN.
