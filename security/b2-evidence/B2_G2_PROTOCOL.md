@@ -597,6 +597,10 @@ VarHandle giữ UNKNOWN. Lookup nhiều interface được xử lý bảo thủ,
 VM maximally-specific/default selection. PRESENT xác nhận definition/kind tĩnh, chưa
 chứng minh access check, classloader visibility, dispatch path hay nhánh thực thi.
 Boot member lấy từ compileSDK37 classfile, luôn ghi COMPILE_BOOT; không thay device proof.
+Program class trùng compile boot class giữ PROGRAM_BOOT_SHADOW/UNKNOWN, không ưu tiên
+app stub thay boot vì loader/API thực chưa được mô hình. Gap qua Android superclass
+không có removed/provider-member proof giữ UNKNOWN: public SDK stub không phủ hidden
+device APIs. Lookup match có source DEX hoặc selected boot entry/class/JAR hash.
 
 Đọc target/test mapping và usage bằng Java type→JVM descriptor (primitive/array/erased
 signature); phân biệt overload và owner/name/descriptor. Mapping inline từ owner khác

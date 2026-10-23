@@ -1820,7 +1820,8 @@ def p12_lookup(owner, signature, kind, fetch):
         category = 'fields' if kind == 'FIELD' else 'methods'
         if signature in body[category]:
             value = body[category][signature]
-            return [dict(owner=name, flags=value if kind == 'FIELD' else value['flags'], provider=body['provider'])]
+            return [dict(owner=name, flags=value if kind == 'FIELD' else value['flags'], provider=body['provider'],
+                         source=body.get('source'))]
         if signature.startswith('<init>(') or signature.startswith('<clinit>('): return []
         # Fields search superinterfaces before superclass; methods search class chain first.
         if kind == 'FIELD':
@@ -1954,6 +1955,7 @@ def p12_collect(phase):
         return abi_cache[key]
 
     def fetch(owner):
+        if owner in definitions and owner in boot_index: return None  # Boot/program shadow: loader/API-dependent.
         if owner in definitions: return definitions[owner][0] if len(definitions[owner]) == 1 else None
         providers = boot_index.get(owner, [])
         if not providers: return None
@@ -1961,6 +1963,7 @@ def p12_collect(phase):
         if len({b['classSha256'] for b in bodies}) != 1: return None
         b = bodies[0]
         return dict(flags=b['flags'], superclass=b['superclass'], interfaces=b['interfaces'], provider='COMPILE_BOOT',
+            source=dict(**providers[0], classSha256=b['classSha256']),
             fields={m['name'] + ':' + m['descriptor']: m['flags'] for m in b['fields']},
             methods={m['name'] + m['descriptor']: dict(flags=m['flags']) for m in b['methods']})
 
@@ -2020,6 +2023,9 @@ def p12_collect(phase):
                 renamed.append(dict(apk=apk_kind, original=record, owner=mapped_owner,
                                     signature=mapped_signature, matches=candidate['matches']))
         if status == 'MISSING' and renamed and not kind_mismatch: status = 'RENAMED'
+        platform_inheritance_unknown = status == 'MISSING' and not removed and not provider_rows and any(
+            name.startswith('Landroid/') for name in resolution['searched'])
+        if platform_inheritance_unknown: status = 'UNKNOWN'  # Public SDK stubs cannot disprove device hidden APIs.
         if status == 'UNKNOWN' and owner not in definitions and owner not in boot_index and provider_rows and not dynamic:
             status = 'MISSING'  # Class absent from captured program/boot; library ABI isn't a runtime provider.
         known_dispatches = dispatches.get((owner, signature, kind), set())
@@ -2038,6 +2044,7 @@ def p12_collect(phase):
                                  signature=signature, kind=kind, dispatch=dispatch), status=status,
             linkage='RESOLVED_STATIC_DEFINITION' if status == 'PRESENT' else 'UNRESOLVED' if status in ['MISSING', 'RENAMED'] else 'UNKNOWN',
             classification=classification, reason=reason, classState='COLLISION' if len(definitions.get(owner, [])) > 1 else
+                'PROGRAM_BOOT_SHADOW' if owner in definitions and owner in boot_index else
                 'PROGRAM_PRESENT' if owner in definitions else 'COMPILE_BOOT_ONLY' if owner in boot_index else 'ABSENT_CAPTURED_PROGRAM_BOOT',
             original=dict(owner=original_owner, signature=original_signature), lookup=resolution,
             mappingEvidence=[dict(apk=provider_apk, **record) for record in origin_candidates],
@@ -2051,7 +2058,8 @@ def p12_collect(phase):
             verification='OBSERVED_VM_ERROR' if hits else 'COMPLETE_STATIC_LOOKUP' if resolution['complete'] else 'BOUNDED_OR_UNKNOWN',
             kindMismatch=kind_mismatch, renamedAlternatives=renamed, removedEvidence=removed,
             selectedProviderABI=provider_rows, providerAmbiguous=len({p['classSha256'] for p in provider_rows}) > 1,
-            observedEvidence=hits, observedStaticConflict=observed_conflict, sites=sites))
+            observedEvidence=hits, observedStaticConflict=observed_conflict,
+            platformInheritanceUnknown=platform_inheritance_unknown, sites=sites))
     for archive in jars.values(): archive.close()
     counts = {k: sum(r['status'] == k for r in rows) for k in ['PRESENT', 'MISSING', 'RENAMED', 'UNKNOWN']}
     categories = {k: sum(r['classification'] == k for r in rows) for k in ['REQUIRED', 'CONDITIONAL', 'ANNOTATION-METADATA', 'UNKNOWN']}
@@ -2063,6 +2071,7 @@ def p12_collect(phase):
         observedLinkageErrors=observed, unparsedLinkageErrors=unparsed, decodeErrors=errors, mappingParseErrors=mapping_errors,
         unindexedInputs=unindexed, tableCoverage=[dict(source=d['source'], tables=d['memberTableCounts'], uses=len(d['memberUses'])) for d in documents['test']],
         ambiguousOriginalClassMappings={k: sorted(v) for k, v in class_maps.items() if len(v) > 1},
+        programBootShadows=sorted(set(definitions) & set(boot_index)),
         note='All field/method IDs plus decoded instruction/encoded/handle sites; static presence is not device/classloader/execution proof. No keep changes.')
     file = output / 'members.json'; file.write_text(json.dumps(report, indent=2) + '\n')
     lines = ['# P12 member ABI diagnosis', '', 'Status: ' + report['status'], '', 'Counts: ' + json.dumps(counts),
