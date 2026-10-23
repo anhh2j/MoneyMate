@@ -300,6 +300,7 @@ def build():
     p07_safe('license', p07_license_diagnostics)
     p07_safe('p10-build', lambda: p10_closure('build'))
     p11_verify()
+    p07_safe('p12-build', lambda: p12_collect('build'))
 
 
 def write_p06_observer():
@@ -828,6 +829,7 @@ def instrument():
         p07_safe('results', p07_result_index)
         p08_runtime_observation()
         p07_safe('p10-runtime', lambda: p10_closure('runtime'))
+        p07_safe('p12-runtime', lambda: p12_collect('runtime'))
 
 
 def dex_classes(raw):
@@ -1017,7 +1019,7 @@ def p10_dex(raw, source):
         for i in range(u32(u32(52))):
             kind, _, count, offset = struct.unpack_from('<HHII', raw, u32(52) + 4 + i * 12)
             maps[kind] = (count, offset)
-    refs, definitions, errors = [], {}, []
+    refs, definitions, errors, member_uses = [], {}, [], []
 
     def add(type_name, kind, owner, member='', target_member='', pc=None, line=None, detail=''):
         for base in p10_types(type_name):
@@ -1025,8 +1027,16 @@ def p10_dex(raw, source):
             refs.append(dict(type=base, kind=kind, owner=owner, member=member, referencedMember=target_member,
                              dexPc=pc, dexLine=line, detail=detail))
 
-    def symbol(table, index, kind, owner, member, pc=None, line=None):
+    def symbol(table, index, kind, owner, member, pc=None, line=None, dispatch=None):
         target, signature = table[index]
+        member_kind = 'FIELD' if table is fields else 'METHOD'
+        if dispatch is None and kind.startswith('FIELD_ACCESS_'):
+            dispatch = 'STATIC' if int(kind.split('_')[-1], 16) >= 0x60 else 'INSTANCE'
+        elif dispatch is None and kind.startswith('INVOKE_'):
+            dispatch = 'STATIC' if int(kind.split('_')[-1], 16) in [0x71, 0x77] else 'INSTANCE'
+        member_uses.append(dict(owner=target, signature=signature, memberKind=member_kind,
+                                dispatch=dispatch or 'UNKNOWN', siteKind=kind, useOwner=owner,
+                                useMember=member, dexPc=pc, dexLine=line, tableIndex=index))
         add(target, kind, owner, member, signature, pc, line)
         add(signature, kind + '_SIGNATURE', owner, member, signature, pc, line)
         return target + '->' + signature
@@ -1034,7 +1044,8 @@ def p10_dex(raw, source):
     def handle(index, kind, owner, member, pc=None, line=None):
         count, base = maps.get(8, (0, 0)); assert index < count
         category, _, index, _ = struct.unpack_from('<HHHH', raw, base + index * 8)
-        symbol(fields if category <= 3 else methods, index, kind, owner, member, pc, line)
+        symbol(fields if category <= 3 else methods, index, kind, owner, member, pc, line,
+               'STATIC' if category in [0, 1, 4] else 'INSTANCE')
 
     def annotation(o, owner, member, kind):
         index, o = leb(o); add(types[index], kind, owner, member)
@@ -1177,7 +1188,15 @@ def p10_dex(raw, source):
     for t in types:
         for base in p10_types(t):
             if base not in mentioned: add(base, 'TYPE_IDS_ONLY', '', detail='No decoded use site; not a requirement')
-    return dict(source=source, dexSha256=sha(raw), definitions=definitions, references=refs, decodeErrors=errors)
+    used = {(r['memberKind'], r['tableIndex']) for r in member_uses}
+    for member_kind, table in [('FIELD', fields), ('METHOD', methods)]:
+        for index, (owner, signature) in enumerate(table):
+            if (member_kind, index) not in used:
+                member_uses.append(dict(owner=owner, signature=signature, memberKind=member_kind,
+                    dispatch='UNKNOWN', siteKind='MEMBER_ID_ONLY', useOwner='', useMember='',
+                    dexPc=None, dexLine=None, tableIndex=index))
+    return dict(source=source, dexSha256=sha(raw), definitions=definitions, references=refs, decodeErrors=errors,
+                memberUses=member_uses, memberTableCounts=dict(fields=len(fields), methods=len(methods)))
 
 
 def p10_classfile(raw):
@@ -1726,6 +1745,335 @@ def p11_verify():
         report['status'] = 'FAIL'; report['failures'].append(type(error).__name__ + ': ' + str(error))
     write_json('p11-abi-oracle.json', report)
     assert report['status'] == 'PASS', 'STOP P11 ABI oracle: ' + str(report['failures'])
+
+
+def p12_java_type(text):
+    text = text.strip(); dimensions = 0
+    while text.endswith('[]'): dimensions += 1; text = text[:-2]
+    primitives = dict(void='V', boolean='Z', byte='B', char='C', short='S', int='I', long='J', float='F', double='D')
+    assert re.fullmatch(r'[\w.$-]+', text), 'Unsupported mapped Java type: ' + text
+    return '[' * dimensions + (primitives[text] if text in primitives else 'L' + text.replace('.', '/') + ';')
+
+
+def p12_member_line(line, owner):
+    line = re.sub(r'^\d+:\d+:', '', line.strip())
+    line = re.sub(r'^(?:(?:public|protected|private|static|final|abstract|native|synthetic|bridge|volatile|transient|synchronized|strictfp|varargs|enum)\s+)+', '', line)
+    if '(' in line:
+        match = re.fullmatch(r'(?:(\S+)\s+)?([^\s(]+)\(([^)]*)\)(?::\d+(?::\d+)?)?', line)
+        assert match, 'Unsupported mapping method: ' + line
+        result, name, params = match.groups(); declaring = owner
+        if not result:
+            assert name == owner[1:-1].replace('/', '.') or name == '<init>'
+            result, name = 'void', '<init>'
+        elif '.' in name:
+            declaring, name = name.rsplit('.', 1); declaring = p12_java_type(declaring)
+        descriptor = '(' + ''.join(p12_java_type(p) for p in params.split(',') if p) + ')' + p12_java_type(result)
+        return dict(kind='METHOD', name=name, descriptor=descriptor, originalOwner=declaring)
+    match = re.fullmatch(r'(\S+)\s+(\S+)', line); assert match, 'Unsupported mapping field: ' + line
+    return dict(kind='FIELD', name=match[2], descriptor=p12_java_type(match[1]), originalOwner=owner)
+
+
+def p12_mapping(text, usage):
+    classes, members, removed, errors, owner = {}, [], [], [], None
+    for number, line in enumerate(text.splitlines(), 1):
+        if not line or line.startswith('#'): continue
+        match = re.fullmatch(r'([^\s]+) -> ([^\s]+):', line)
+        if match: owner = p12_java_type(match[1]); classes[owner] = p12_java_type(match[2]); continue
+        if line.lstrip().startswith('#'): continue
+        try:
+            left, mapped = line.strip().rsplit(' -> ', 1); assert owner
+            record = p12_member_line(left, owner)
+            members.append(dict(**record, mappingOwner=owner, mappedName=mapped, line=number,
+                                inlinedFromOtherOwner=record['originalOwner'] != owner))
+        except (AssertionError, ValueError) as error: errors.append(dict(line=number, text=line, error=str(error)))
+    owner = None
+    for number, line in enumerate(usage.splitlines(), 1):
+        if not line: continue
+        if not line.startswith(' '):
+            owner = p12_java_type(line.rstrip(':'))
+            if not line.endswith(':'): removed.append(dict(originalOwner=owner, kind='CLASS', line=number))
+        else:
+            try:
+                record = p12_member_line(line, owner); assert owner
+                removed.append(dict(**record, line=number))
+            except (AssertionError, ValueError) as error: errors.append(dict(usageLine=number, text=line, error=str(error)))
+    return dict(classes=classes, members=members, removed=removed, parseErrors=errors)
+
+
+def p12_remap(descriptor, classes):
+    at = descriptor.find('(') if '(' in descriptor else descriptor.find(':') + 1 if ':' in descriptor else 0
+    return descriptor[:at] + re.sub(r'L[^;]+;', lambda m: classes.get(m[0], m[0]), descriptor[at:])
+
+
+def p12_signature(record, mapped=False, classes=None):
+    return (record['mappedName'] if mapped else record['name']) + (':' if record['kind'] == 'FIELD' else '') + (
+        p12_remap(record['descriptor'], classes or {}) if mapped else record['descriptor'])
+
+
+def p12_lookup(owner, signature, kind, fetch):
+    """Conservative symbolic resolution: don't claim missing across incomplete/ambiguous hierarchy."""
+    visited, incomplete = set(), []
+    def visit(name, interface_phase=False):
+        if name in visited: return []
+        visited.add(name); body = fetch(name)
+        if body is None: incomplete.append(name); return []
+        category = 'fields' if kind == 'FIELD' else 'methods'
+        if signature in body[category]:
+            value = body[category][signature]
+            return [dict(owner=name, flags=value if kind == 'FIELD' else value['flags'], provider=body['provider'])]
+        if signature.startswith('<init>(') or signature.startswith('<clinit>('): return []
+        # Fields search superinterfaces before superclass; methods search class chain first.
+        if kind == 'FIELD':
+            found = [r for parent in body['interfaces'] for r in visit(parent, True)]
+            if found: return found
+        if body['superclass']:
+            found = visit(body['superclass'])
+            if found: return found
+        if kind == 'METHOD':
+            return [r for parent in body['interfaces'] for r in visit(parent, True)]
+        return []
+    found = visit(owner)
+    unique = {(r['owner'], r['flags'], r['provider']) for r in found}
+    # Multiple interface declarations/default selection need VM maximally-specific rules.
+    return dict(matches=found, complete=not incomplete and len(unique) <= 1,
+                incompleteHierarchy=incomplete, ambiguous=len(unique) > 1, searched=sorted(visited))
+
+
+def p12_classify(resolution, site_kinds, observed):
+    if observed: return 'REQUIRED', 'CRASH_OBSERVED_MEMBER_IDENTITY_NOT_EVERY_SITE_EXECUTED'
+    if all(k.startswith('ANNOTATION_') for k in site_kinds): return 'ANNOTATION-METADATA', 'ENCODED_ANNOTATION_MEMBER_ONLY'
+    if set(site_kinds) == {'MEMBER_ID_ONLY'}: return 'UNKNOWN', 'MEMBER_ID_IS_NOT_EXECUTION'
+    if resolution == 'UNKNOWN': return 'UNKNOWN', 'INCOMPLETE_OR_DYNAMIC_RESOLUTION'
+    return 'CONDITIONAL', 'STATIC_USE_WITHOUT_EXECUTION_PROOF'
+
+
+def p12_negative_controls():
+    def body(fields=None, methods=None, parent=None, interfaces=None):
+        return dict(fields=fields or {}, methods=methods or {}, superclass=parent, interfaces=interfaces or [], provider='PROGRAM')
+    base = {'LA;': body({'live:I': 9}, {'run()V': dict(flags=1), '<init>()V': dict(flags=1), '<clinit>()V': dict(flags=8)}),
+            'LB;': body(parent='LA;'), 'LI;': body({'live:I': 9}), 'LC;': body(parent='LA;', interfaces=['LI;'])}
+    lookup = lambda o, s, k, data=base: p12_lookup(o, s, k, data.get)
+    cases = []
+    def check(name, value): assert value, name; cases.append(dict(case=name, result='PASS'))
+    check('class-only-does-not-prove-member', not lookup('LA;', 'gone:I', 'FIELD')['matches'])
+    check('descriptor-overload-exact', not lookup('LA;', 'live:J', 'FIELD')['matches'])
+    check('inherited-field', lookup('LB;', 'live:I', 'FIELD')['matches'][0]['owner'] == 'LA;')
+    check('field-interface-before-superclass', lookup('LC;', 'live:I', 'FIELD')['matches'][0]['owner'] == 'LI;')
+    check('inherited-method', lookup('LB;', 'run()V', 'METHOD')['matches'][0]['owner'] == 'LA;')
+    check('constructor-not-inherited', not lookup('LB;', '<init>()V', 'METHOD')['matches'])
+    check('clinit-not-inherited', not lookup('LB;', '<clinit>()V', 'METHOD')['matches'])
+    check('missing-owner-incomplete', not lookup('LX;', 'x:I', 'FIELD')['complete'])
+    data = dict(base, **{'LD;': body(parent='LX;')})
+    check('missing-parent-not-verified-missing', not lookup('LD;', 'x:I', 'FIELD', data)['complete'])
+    check('static-kind-is-not-instance', bool(lookup('LA;', 'live:I', 'FIELD')['matches'][0]['flags'] & 8))
+    mapping = p12_mapping('a.A -> q:\n    int live -> a\n    1:2:void run(int[]):3:4 -> b\n', 'a.A:\n    public static int gone\n')
+    check('mapping-field-rename-distinct-from-removal', mapping['members'][0]['mappedName'] == 'a' and mapping['removed'][0]['name'] == 'gone')
+    check('mapped-method-array-prototype', mapping['members'][1]['descriptor'] == '([I)V')
+    check('class-map-not-member-map', not any(m['name'] == 'gone' for m in mapping['members']))
+    renamed = {'Lq;': body({'a:I': 9})}
+    check('stale-renamed-reference-unresolved', not lookup('Lq;', 'live:I', 'FIELD', renamed)['matches'])
+    check('renamed-live-definition-present', bool(lookup('Lq;', 'a:I', 'FIELD', renamed)['matches']))
+    check('method-overload-descriptor', not lookup('LA;', 'run(I)V', 'METHOD')['matches'])
+    ambiguous = dict(base, **{'LJ;': body({'live:I': 9}), 'LK;': body(interfaces=['LI;', 'LJ;'])})
+    check('ambiguous-interface-not-verified', not lookup('LK;', 'live:I', 'FIELD', ambiguous)['complete'])
+    check('obfuscated-descriptor-types', p12_remap('(La/A;)[La/A;', {'La/A;': 'Lq;'}) == '(Lq;)[Lq;')
+    check('member-name-L-is-not-descriptor', p12_remap('getLoader(La/A;)La/A;', {'La/A;': 'Lq;'}) == 'getLoader(Lq;)Lq;')
+    check('malformed-mapping-explicit-error', bool(p12_mapping('a.A -> q:\n    unsupported -> x\n', '')['parseErrors']))
+    check('id-only-not-required', p12_classify('MISSING', ['MEMBER_ID_ONLY'], False)[0] == 'UNKNOWN')
+    check('annotation-not-required', p12_classify('PRESENT', ['ANNOTATION_1'], False)[0] == 'ANNOTATION-METADATA')
+    check('static-missing-not-observed-required', p12_classify('MISSING', ['FIELD_ACCESS_0x62'], False)[0] == 'CONDITIONAL')
+    check('observed-member-required', p12_classify('MISSING', ['FIELD_ACCESS_0x62'], True)[0] == 'REQUIRED')
+    check('unknown-remains-unknown', p12_classify('UNKNOWN', ['INVOKE_0x6e'], False)[0] == 'UNKNOWN')
+    return cases
+
+
+def p12_collect(phase):
+    """Diagnostic only: symbol existence/kind is separate from runtime requirement."""
+    output = REPORT / ('p12-' + phase); output.mkdir(exist_ok=True)
+    manifest, documents, definitions, errors = [], {}, {}, []
+    for apk_kind, directory in [('target', 'release'), ('test', 'androidTest/release')]:
+        paths = list((HARNESS / 'build/outputs/apk' / directory).glob('*.apk')); assert len(paths) == 1
+        path = paths[0]; documents[apk_kind] = []
+        with zipfile.ZipFile(path) as archive:
+            for entry in archive.namelist():
+                if not re.fullmatch(r'classes\d*\.dex', entry): continue
+                source = dict(apk=apk_kind, path=str(path.relative_to(ROOT)), apkSha256=sha(path.read_bytes()), entry=entry)
+                doc = p10_dex(archive.read(entry), source); documents[apk_kind].append(doc); errors.extend(doc['decodeErrors'])
+                file = output / (apk_kind + '-' + entry + '.json'); file.write_text(json.dumps(doc, indent=2) + '\n')
+                manifest.append(dict(path=str(file.relative_to(ROOT)), sha256=sha(file.read_bytes())))
+                for owner, info in doc['definitions'].items():
+                    definitions.setdefault(owner, []).append(dict(**info, provider=apk_kind,
+                        source=dict(**source, dexSha256=doc['dexSha256'])))
+    mappings, source_manifest = {}, []
+    for apk_kind, variant in [('target', 'release'), ('test', 'releaseAndroidTest')]:
+        directory = HARNESS / 'build/outputs/mapping' / variant
+        files = {name: directory / name for name in ['mapping.txt', 'usage.txt']}
+        mappings[apk_kind] = p12_mapping(files['mapping.txt'].read_text(), files['usage.txt'].read_text())
+        source_manifest.extend(dict(path=str(p.relative_to(ROOT)), sha256=sha(p.read_bytes()), apk=apk_kind) for p in files.values())
+    # Merge original descriptor names only when both mapping files agree; ambiguous aliases stay unknown.
+    class_maps = {}
+    for mapping in mappings.values():
+        for original, obfuscated in mapping['classes'].items(): class_maps.setdefault(original, set()).add(obfuscated)
+    forward = {k: next(iter(v)) for k, v in class_maps.items() if len(v) == 1}
+    reverse = {}
+    for original, obfuscated in forward.items(): reverse.setdefault(obfuscated, set()).add(original)
+    unmap = {k: next(iter(v)) for k, v in reverse.items() if len(v) == 1}
+    mapped_members, original_members, removed_members = {}, {}, {}
+    for apk_kind, cmap in mappings.items():
+        for record in cmap['members']:
+            if record['inlinedFromOtherOwner']: continue
+            key = (cmap['classes'].get(record['mappingOwner']), p12_signature(record, True, forward), record['kind'])
+            mapped_members.setdefault((apk_kind, *key), []).append(record)
+            original_members.setdefault((record['originalOwner'], p12_signature(record), record['kind']), []).append((apk_kind, record))
+        for record in cmap['removed']:
+            key = (record['originalOwner'], '' if record['kind'] == 'CLASS' else p12_signature(record), record['kind'])
+            removed_members.setdefault(key, []).append(dict(apk=apk_kind, **record))
+    jars, index, boot_index, abi_cache, unindexed = {}, {}, {}, {}, []
+    for apk_kind, filename in [('target', 'p11-target-r8-inputs.json'), ('test', 'p06-r8-inputs.json')]:
+        path = REPORT / filename; inputs = json.loads(path.read_text())
+        assert inputs['status'] == 'OBSERVED' and inputs['mutatesTaskInputs'] is False
+        source_manifest.append(dict(path=str(path.relative_to(ROOT)), sha256=sha(path.read_bytes())))
+        for role in ['programClasses', 'referencedClasses', 'bootClasspath']:
+            for item in inputs[role]:
+                jar = pathlib.Path(item['path'])
+                if not jar.is_file() or jar.suffix != '.jar':
+                    unindexed.append(dict(apk=apk_kind, role=role, path=str(jar), reason='NOT_JAR; actual DEX decoded')); continue
+                assert sha(jar.read_bytes()) == item['sha256'], 'P12 observed input hash changed'
+                if str(jar) not in jars: jars[str(jar)] = zipfile.ZipFile(jar)
+                coordinate = re.search(r'/files-2\.1/([^/]+)/([^/]+)/([^/]+)/', str(jar))
+                for entry in jars[str(jar)].namelist():
+                    if not entry.endswith('.class') or entry.startswith('META-INF/versions/'): continue
+                    owner = 'L' + entry[:-6] + ';'
+                    record = dict(apk=apk_kind, role=role, path=str(jar), jarSha256=item['sha256'], entry=entry,
+                                  coordinate=':'.join(coordinate.groups()) if coordinate else None)
+                    (boot_index if role == 'bootClasspath' else index).setdefault(owner, []).append(record)
+
+    def abi(record):
+        key = record['path'], record['entry']
+        if key not in abi_cache: abi_cache[key] = p10_classfile(jars[key[0]].read(key[1]))
+        return abi_cache[key]
+
+    def fetch(owner):
+        if owner in definitions: return definitions[owner][0] if len(definitions[owner]) == 1 else None
+        providers = boot_index.get(owner, [])
+        if not providers: return None
+        bodies = [abi(p) for p in providers]
+        if len({b['classSha256'] for b in bodies}) != 1: return None
+        b = bodies[0]
+        return dict(flags=b['flags'], superclass=b['superclass'], interfaces=b['interfaces'], provider='COMPILE_BOOT',
+            fields={m['name'] + ':' + m['descriptor']: m['flags'] for m in b['fields']},
+            methods={m['name'] + m['descriptor']: dict(flags=m['flags']) for m in b['methods']})
+
+    # Crash evidence comes from this run's JUnit failures, not mere presence of a log file.
+    observed, unparsed = [], []
+    if phase == 'runtime':
+        for path in (HARNESS / 'build/outputs/androidTest-results').rglob('*.xml'):
+            for test in ET.parse(path).getroot().iter('testcase'):
+                for failure in list(test):
+                    text = failure.get('message', '') + '\n' + ''.join(failure.itertext())
+                    if not re.search(r'NoSuch(?:Field|Method)Error', text): continue
+                    field = re.search(r'No field (\S+) of type (\S+) in class (L[^;]+;)', text)
+                    method = re.search(r'No (static|virtual|direct|interface) method (\S+) in class (L[^;]+;)', text)
+                    record = dict(path=str(path.relative_to(ROOT)), sha256=sha(path.read_bytes()), testcase=test.get('name'),
+                                  frames=re.findall(r'at ([\w.$]+)\.([^\s(]+)\([^\n]*?:(\d+)\)', text))
+                    if field: observed.append(dict(**record, kind='FIELD', owner=field[3], signature=field[1] + ':' + field[2], dispatch='UNKNOWN'))
+                    elif method: observed.append(dict(**record, kind='METHOD', owner=method[3], signature=method[2], dispatch='STATIC' if method[1] == 'static' else 'INSTANCE'))
+                    else: unparsed.append(record)
+    grouped = {}
+    for doc in documents['test']:
+        for use in doc['memberUses']:
+            key = (use['owner'], use['signature'], use['memberKind'], use['dispatch'])
+            grouped.setdefault(key, []).append(dict(**use, source=doc['source'], dexSha256=doc['dexSha256']))
+    dispatches = {}
+    for owner, signature, kind, dispatch in grouped:
+        if dispatch != 'UNKNOWN': dispatches.setdefault((owner, signature, kind), set()).add(dispatch)
+    rows = []
+    for (owner, signature, kind, dispatch), sites in sorted(grouped.items()):
+        resolution = p12_lookup(owner, signature, kind, fetch)
+        dynamic = owner.startswith('[') or owner in ['Ljava/lang/invoke/MethodHandle;', 'Ljava/lang/invoke/VarHandle;']
+        matches = resolution['matches']; kind_mismatch = bool(matches) and dispatch != 'UNKNOWN' and any(
+            bool(m['flags'] & 8) != (dispatch == 'STATIC') for m in matches)
+        status = 'UNKNOWN' if not resolution['complete'] else 'PRESENT' if matches and not kind_mismatch else 'MISSING'
+        if dynamic or len(definitions.get(owner, [])) > 1: status = 'UNKNOWN'
+        if dispatch == 'STATIC' and any(m['owner'] != owner and fetch(m['owner'])['flags'] & 0x200 for m in matches):
+            status = 'UNKNOWN'  # Interface static methods are not inherited like class statics.
+        provider_apk = definitions.get(owner, [{}])[0].get('provider')
+        origin_candidates = mapped_members.get((provider_apk, owner, signature, kind), [])
+        original_owner = unmap.get(owner, owner); original_signature = p12_remap(signature, unmap)
+        if len({(r['originalOwner'], p12_signature(r)) for r in origin_candidates}) == 1:
+            original_owner = origin_candidates[0]['originalOwner']; original_signature = p12_signature(origin_candidates[0])
+        providers = index.get(original_owner, [])
+        preferred = [p for p in providers if p['apk'] == provider_apk and p['role'] == 'programClasses']
+        if preferred: providers = preferred
+        provider_rows = []
+        for p in providers:
+            b = abi(p); category = 'fields' if kind == 'FIELD' else 'methods'
+            declarations = [m for m in b[category] if m['name'] + (':' if kind == 'FIELD' else '') + m['descriptor'] == original_signature]
+            if declarations: provider_rows.append(dict(source=p, classSha256=b['classSha256'], declarations=declarations))
+        removed = removed_members.get((original_owner, original_signature, kind), []) + removed_members.get((original_owner, '', 'CLASS'), [])
+        renamed = []
+        for apk_kind, record in original_members.get((original_owner, original_signature, kind), []):
+            cmap = mappings[apk_kind]; mapped_owner = cmap['classes'].get(record['mappingOwner'], record['mappingOwner'])
+            mapped_signature = p12_signature(record, True, forward)
+            candidate = p12_lookup(mapped_owner, mapped_signature, kind, fetch)
+            if candidate['matches'] and candidate['complete'] and (mapped_owner, mapped_signature) != (owner, signature):
+                renamed.append(dict(apk=apk_kind, original=record, owner=mapped_owner,
+                                    signature=mapped_signature, matches=candidate['matches']))
+        if status == 'MISSING' and renamed and not kind_mismatch: status = 'RENAMED'
+        if status == 'UNKNOWN' and owner not in definitions and owner not in boot_index and provider_rows and not dynamic:
+            status = 'MISSING'  # Class absent from captured program/boot; library ABI isn't a runtime provider.
+        known_dispatches = dispatches.get((owner, signature, kind), set())
+        hits = [r for r in observed if r['owner'] == owner and r['signature'] == signature and r['kind'] == kind and
+                (r['dispatch'] == dispatch or r['dispatch'] == 'UNKNOWN' and known_dispatches == {dispatch})]
+        observed_conflict = bool(hits and status == 'PRESENT')
+        if hits and not matches: status = 'MISSING'  # Typed VM failure independently proves this symbolic gap.
+        elif observed_conflict: status = 'UNKNOWN'  # Device/classloader evidence conflicts with static provider.
+        classification, reason = p12_classify(status, [s['siteKind'] for s in sites], bool(hits))
+        for site in sites:
+            site['observedFrameMatch'] = any((site['useOwner'][1:-1].replace('/', '.'), site['useMember'].split('(')[0],
+                                            str(site['dexLine'])) in [tuple(f) for f in h['frames']] for h in hits)
+        member_name = signature.split(':' if kind == 'FIELD' else '(')[0]
+        member_descriptor = signature[len(member_name) + (1 if kind == 'FIELD' else 0):]
+        rows.append(dict(key=dict(owner=owner, name=member_name, descriptor=member_descriptor,
+                                 signature=signature, kind=kind, dispatch=dispatch), status=status,
+            linkage='RESOLVED_STATIC_DEFINITION' if status == 'PRESENT' else 'UNRESOLVED' if status in ['MISSING', 'RENAMED'] else 'UNKNOWN',
+            classification=classification, reason=reason, classState='COLLISION' if len(definitions.get(owner, [])) > 1 else
+                'PROGRAM_PRESENT' if owner in definitions else 'COMPILE_BOOT_ONLY' if owner in boot_index else 'ABSENT_CAPTURED_PROGRAM_BOOT',
+            original=dict(owner=original_owner, signature=original_signature), lookup=resolution,
+            mappingEvidence=[dict(apk=provider_apk, **record) for record in origin_candidates],
+            classMappingEvidence=[dict(apk=apk, original=original_owner, mapped=cmap['classes'][original_owner])
+                for apk, cmap in mappings.items() if original_owner in cmap['classes']],
+            ownerRenamed=original_owner != owner,
+            memberNameState='RENAMED' if origin_candidates and original_signature.split(':' if kind == 'FIELD' else '(')[0] !=
+                signature.split(':' if kind == 'FIELD' else '(')[0] else 'UNCHANGED_OR_UNMAPPED',
+            gapKind='NONE' if status == 'PRESENT' else 'UNKNOWN' if status == 'UNKNOWN' else 'RENAMED_SYMBOL' if status == 'RENAMED' else
+                'STATIC_INSTANCE_MISMATCH' if kind_mismatch else 'CLASS_ABSENT' if owner not in definitions and owner not in boot_index else 'MEMBER_ABSENT',
+            verification='OBSERVED_VM_ERROR' if hits else 'COMPLETE_STATIC_LOOKUP' if resolution['complete'] else 'BOUNDED_OR_UNKNOWN',
+            kindMismatch=kind_mismatch, renamedAlternatives=renamed, removedEvidence=removed,
+            selectedProviderABI=provider_rows, providerAmbiguous=len({p['classSha256'] for p in provider_rows}) > 1,
+            observedEvidence=hits, observedStaticConflict=observed_conflict, sites=sites))
+    for archive in jars.values(): archive.close()
+    counts = {k: sum(r['status'] == k for r in rows) for k in ['PRESENT', 'MISSING', 'RENAMED', 'UNKNOWN']}
+    categories = {k: sum(r['classification'] == k for r in rows) for k in ['REQUIRED', 'CONDITIONAL', 'ANNOTATION-METADATA', 'UNKNOWN']}
+    mapping_errors = {k: v['parseErrors'] for k, v in mappings.items() if v['parseErrors']}
+    report = dict(authority='Issue16 comment6368999821', phase=phase, diagnosticOnly=True, acceptanceChanged=False,
+        status='PARTIAL_NOT_VERIFIED' if errors or mapping_errors or unparsed else 'COLLECTED',
+        source=json.loads((REPORT / 'source.json').read_text()), dexReports=manifest, evidenceSources=source_manifest,
+        negativeControls=p12_negative_controls(), counts=counts, classifications=categories, members=rows,
+        observedLinkageErrors=observed, unparsedLinkageErrors=unparsed, decodeErrors=errors, mappingParseErrors=mapping_errors,
+        unindexedInputs=unindexed, tableCoverage=[dict(source=d['source'], tables=d['memberTableCounts'], uses=len(d['memberUses'])) for d in documents['test']],
+        ambiguousOriginalClassMappings={k: sorted(v) for k, v in class_maps.items() if len(v) > 1},
+        note='All field/method IDs plus decoded instruction/encoded/handle sites; static presence is not device/classloader/execution proof. No keep changes.')
+    file = output / 'members.json'; file.write_text(json.dumps(report, indent=2) + '\n')
+    lines = ['# P12 member ABI diagnosis', '', 'Status: ' + report['status'], '', 'Counts: ' + json.dumps(counts),
+             'Classifications: ' + json.dumps(categories), '',
+             'PRESENT is static definition/kind only. RENAMED with stale symbolic reference remains unresolved.', '',
+             '| Owner / member / kind | Status | Requirement | Evidence |', '|---|---|---|---|']
+    for r in rows:
+        k = r['key']; lines.append('| `' + k['owner'] + '->' + k['signature'] + ' ' + k['dispatch'] + '` | ' + r['status'] +
+            ' | ' + r['classification'] + ' | sites=' + str(len(r['sites'])) + '; removed=' + str(len(r['removedEvidence'])) +
+            '; renamed=' + str(len(r['renamedAlternatives'])) + '; observed=' + str(len(r['observedEvidence'])) + ' |')
+    (output / 'members.md').write_text('\n'.join(lines) + '\n')
 
 
 def inspect():

@@ -568,3 +568,87 @@ giữ raw FAIL. Đây là lỗi oracle trước instrumentation, không phải c
 Đã sửa chỉ inspector/protocol: actual original class_def bắt buộc, header nếu có không
 được rename; thêm renamed-mapping negative và2 positive boundary controls. Keep byte
 không đổi. Lần chạy lại tại HEAD sửa oracle mới là bằng chứng để bàn giao P11.
+
+### G2-P12 — chẩn đoán member ABI, không sửa runtime
+
+Theo PO6368999821/Leader6368952905, delta chỉ inspector/protocol trên mốc P11
+3dce1fdc415256d795574dde51ec66232e27fb7d. Không sửa keep/build/input/task wiring,
+metadata796/catalog/dependencies/toolchain/test/KAT/runner/workflow/gate/production.
+
+Collector `p12-build/` và `p12-runtime/` sinh `members.json` + `members.md`, source/hash
+manifest và25 controls. Hai hook dùng safe diagnostic wrapper sau build/oracle và
+sau instrumentation/P10; không thay exit/acceptance cũ. API26 lỗi clear-logcat vẫn
+dừng trước instrumentation, chỉ có build report. CI nền phải cùng HEAD,4 cell tối đa
+30 phút/cell, retention3 ngày; QA độc lập trước Leader review, PR17/18 giữ Draft.
+
+Coverage: mọi field_id/method_id của actual test DEX được biểu diễn ít nhất một lần,
+gồm các symbol có decoded instruction/annotation/static-encoded/handle sites, hoặc
+MEMBER_ID_ONLY nếu không có decoded use. Decoder giữ nguyên P10 definitions/type refs,
+chỉ thêm memberUses và table counts. Key là owner + name/descriptor + FIELD/METHOD +
+STATIC/INSTANCE/UNKNOWN. ID pool/annotation/CP không tự thành executed code; method
+handles giữ dispatch từ handle kind, invokes/field opcodes giữ static/instance.
+Không coi method_ids/field_ids là definitions. DEX PCs/dòng là minified positions.
+
+Final target/test class_defs/class_data quyết định sự hiện diện thật và declared ABI.
+Field lookup: class, superinterfaces rồi superclass. Method lookup: class/superclass
+rồi interfaces; constructor/clinit không inherited. Missing hierarchy, class collision,
+ambiguous interface/default resolution, arrays và signature-polymorphic MethodHandle/
+VarHandle giữ UNKNOWN. Lookup nhiều interface được xử lý bảo thủ, không mô phỏng đủ
+VM maximally-specific/default selection. PRESENT xác nhận definition/kind tĩnh, chưa
+chứng minh access check, classloader visibility, dispatch path hay nhánh thực thi.
+Boot member lấy từ compileSDK37 classfile, luôn ghi COMPILE_BOOT; không thay device proof.
+
+Đọc target/test mapping và usage bằng Java type→JVM descriptor (primitive/array/erased
+signature); phân biệt overload và owner/name/descriptor. Mapping inline từ owner khác
+không tự dùng làm renamed proof. Original↔obfuscated class aliases mâu thuẫn giữ rõ
+ambiguous; không suy field rename chỉ từ class rename. Member rename cần exact member
+mapping tới actual live definition. Usage CLASS removal khác block removed MEMBER.
+Unknown format ghi parseErrors/PARTIAL_NOT_VERIFIED, không bỏ lặng lẽ. Varargs/enum
+usage modifiers và JVM package-info class names được hỗ trợ.
+
+Hai trục độc lập:
+- status PRESENT: exact symbolic member/kind resolve tĩnh; memberNameState có thể
+  RENAMED nếu chính reference đã dùng tên mới. ownerRenamed được ghi riêng.
+- status MISSING: thiếu class trong captured program/boot có selected provider, thiếu
+  member khi lookup đầy đủ, kind mismatch, hoặc typed VM error chứng minh gap.
+- status RENAMED: symbolic reference cũ không resolve nhưng mapping có alternative
+  member sống. Linkage vẫn UNRESOLVED, không báo PRESENT để che stale reference.
+- status UNKNOWN: thiếu/ambiguous hierarchy/provider, dynamic semantics hoặc conflict.
+- REQUIRED chỉ từ typed NoSuchField/MethodError của XML failure run hiện tại. Phân biệt
+  identity bị lỗi với site nào trùng actual stack frame; không nói mọi site đã chạy.
+  Field error không nêu dispatch chỉ gán khi actual instruction dispatch duy nhất.
+- CONDITIONAL cho static site không có crash proof; ANNOTATION-METADATA cho typed
+  annotation-only; UNKNOWN cho MEMBER_ID_ONLY hoặc resolution chưa đủ. Không coi toàn
+  bộ static gaps là runtime-required. Build pha chưa có crash không mượn seed P11.
+
+Nguồn ABI: JAR entries từ target/test observed program/referenced/boot inputs, hash
+đối chiếu trước đọc; ưu tiên program input tương ứng owner APK. Lưu selected member
+declaration/access/static flags, class hash/JAR hash/coordinate khi có; provider ABI
+khác nhau ghi ambiguity. Non-JAR inputs ghi unindexed, actual final program DEX vẫn
+decode đầy đủ. Classfile ABI/CP không phải per-method execution. Report có mapping/
+usage/input/DEX/APK/XML hashes và table coverage để QA kiểm toán từng row.
+
+25 controls kiểm class-only khác member proof, exact overload/descriptor, inheritance
+field/method và interface precedence, constructor không inherited, incomplete owner/
+parent, static-kind, member rename khác removal/class-map, array/obfuscated descriptor,
+tên member chứa L, malformed mapping, stale/live renamed references, ambiguous interfaces,
+clinit không inherited và taxonomy observed/static/annotation/ID-only.
+Controls chỉ trên dữ liệu synthetic, không mutate APK/input/source hay gate.
+
+P11 exemplar cần chứng minh lại: mapping kotlin.text.Charsets→q; actual Lq; có
+US_ASCII→a, không UTF_8; usage removed field UTF_8; test sget-object q.UTF_8:Charset
+trong constructor PC3/dòng4; XML NoSuchFieldError và frame tương ứng. Class có mặt
+không đủ. Lỗi JUnit-caught có thể không ở crash buffer, dùng XML/TestRunner evidence.
+
+Thiết kế tối thiểu CHƯA ÁP DỤNG cho member đã observed (nếu vẫn xác nhận đúng ở P12):
+`-keepclassmembers class kotlin.text.Charsets { public static final java.nio.charset.Charset UTF_8; }`
+chỉ giữ exact field ABI khi class còn sống; class owner có thể vẫn obfuscate nhưng phải
+remap đồng nhất ở test. Không bảo đảm class survival bằng keepclassmembers; nếu cần
+class identity root/allowoptimization riêng phải trình Leader/PO với evidence. Không
+đề xuất giữ mọi Charsets member/namespace, không thêm dependency. Các conditional gaps
+khác cần review actual call-path và source-to-final-DEX riêng, không tự nối keep theo
+crash. Chưa chứng minh minimum toàn cục/đủ5 test bodies/JNI/KAT/20 metrics.
+
+Nếu cần sửa keep/dependency/acceptance để chữa gap: STOP xin PO quyết định riêng.
+API26 logcat, permission AndroidX, apksigner/aapt, license collector/legal và ARM64 thật/
+ARM64-16KiB thật/native OOM vẫn OPEN ngoài P12. Không Ready/merge/tag/release/production.
