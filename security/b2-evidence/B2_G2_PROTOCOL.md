@@ -235,3 +235,53 @@ out-of-scope need means STOP/report; no dontwarn, task disable or fallback is au
 All four cells must provide actual lint XML and runtime/security/license evidence, with
 CI at the new HEAD. Infrastructure retry may be recorded by run/attempt; old CI PASS is
 not substituted. PR17/18 remain Draft; ARM64/kernel16KiB/native OOM remain OPEN.
+
+## G2-P07 — chỉ chẩn đoán zero-test / API26 logcat
+
+Thẩm quyền: PO Issue16 comment6359471264, Leader6359453277, QA6359405275.
+Delta chỉ trong inspector và protocol này. P06 được Leader ghi nhận QA-PASS;
+G2 runtime vẫn BLOCKED. Không đổi source/test, build/manifest, workflow, keep rule,
+task wiring, runner argument/filter/variant, dependency/catalog/795 checksum hay gate.
+
+Tái lập: workflow G2 hiện có chạy `preflight`, `build`, `instrument`, `inspect` trên
+cùng HEAD. Lệnh acceptance vẫn nguyên `:connectedReleaseAndroidTest` với strict
+verification; clear-logcat vẫn bắt buộc và lỗi phải được raise. Chỉ tách stdout/stderr
+ra file cho hai lệnh đó, đồng thời giữ combined log cũ. Chưa cấp phép sửa runtime.
+
+Trong build, `p07-license-review.json` đối chiếu inventory/provenance gốc với graph
+target/test compile/runtime và toolchain. Sao chép raw POM từ cache vào build reports,
+ghi SHA256, root namespace và mọi khai báo license (cả POM không namespace). Không sửa
+inventory/scanner, không admission/checksum mới. Khai báo nhiều license không tự chứng
+minh điều kiện lựa chọn/distribution; UNKNOWN cũ và findings vẫn giữ để QA/PO đánh giá.
+
+Trước instrumentation: đọc badging/manifest/chữ ký APK build, DEX class/method/annotation
+metadata bằng dexdump; đọc pm list instrumentation, pm path/dumpsys package đúng hai
+package harness, dumpsys activity instrumentation, getprop/process/log-buffer status,
+logcat runner/classloader và crash buffer. Nếu pm path có bản cài trong /data/app,
+chỉ adb pull APK đó về reports để ghi hash/chữ ký; không install/reinstall/uninstall.
+Sau instrumentation: thu metrics/memory theo thứ tự acceptance cũ rồi lặp snapshot
+chỉ đọc và index/hash XML/PROTO/Gradle output. Artifact workflow giữ XML/PROTO gốc.
+Nếu clear-logcat fail: chụp snapshot lỗi rồi raise lỗi cũ, không chạy instrumentation.
+
+Mỗi lệnh P07 được đánh dấu READ_ONLY_DIAGNOSTIC trong `p07/commands.json`, ghi argv,
+timestamp, stdout/stderr file riêng + SHA256, exit/timeout/error. Timeout 12 giây/lệnh
+(DEX metadata 30 giây). Lỗi diagnostic là NOT-VERIFIED và không thay kết quả acceptance.
+Không gọi thêm `am instrument -w -r`, vì một lần chạy độc lập có thể thực thi test và
+thay state; chỉ quan sát invocation/discovery/runner qua log acceptance, DEX và kết quả
+UTP hiện có. Nếu invocation hay discovery list không xuất hiện trong bằng chứng,
+ghi NOT-VERIFIED, không tạo danh sách test giả hoặc thêm `-e log`/class filter.
+
+Snapshot trước/sau có thể không bắt được khoảng UTP install/uninstall ở giữa; thiếu
+package tại snapshot không chứng minh APK chưa từng cài. Diagnostic có chi phí thời gian
+trước clear-logcat; nếu lỗi API26 không tái hiện, không coi đó là root cause/fix hay dùng
+lần trước làm PASS. Mọi dữ liệu chỉ từ emulator harness dùng synthetic test input.
+
+Acceptance vẫn đòi JUnit5/0/0/0,20 metrics, JNI/KAT thật, R8/DEX isolation/signature/
+page/ABI/bounded memory/lint/security gates. `OBSERVED` chỉ nghĩa thu được lệnh exit0,
+không phải runtime/QA PASS. Zero tests là FAIL; gate chưa tới là NOT-VERIFIED.
+Chẩn đoán/đối chiếu license không phải quyền sửa lỗi hay phê duyệt pháp lý.
+
+Nếu nguyên nhân cần đổi source/test/wiring/keep/workflow/allowlist: DỪNG, giữ raw lỗi,
+nộp phương án riêng cho PO. Chạy đủ4 cell, tối đa30 phút/cell, artifact3 ngày, CI nền
+cùng HEAD nếu có commit. QA kiểm toán độc lập. PR17/18 giữ Draft; không merge/tag/release,
+không T20 production; ARM64 thực/ARM64-16KiB thực/native OOM vẫn OPEN.

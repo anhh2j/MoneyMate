@@ -9,6 +9,7 @@ import re
 import shutil
 import struct
 import subprocess
+import time
 import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
@@ -131,9 +132,14 @@ def write_json(name, value):
     (REPORT / name).write_text(json.dumps(value, indent=2) + '\n')
 
 
-def command(label, args, required=True):
+def command(label, args, required=True, split_streams=False):
     print('RUN', label, flush=True)
-    result = subprocess.run(args, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
+    result = subprocess.run(args, cwd=ROOT, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE if split_streams else subprocess.STDOUT, text=True, check=False)
+    if split_streams:
+        (REPORT / (label + '.stdout.log')).write_text(result.stdout)
+        (REPORT / (label + '.stderr.log')).write_text(result.stderr)
+        result.stdout += result.stderr
     (REPORT / (label + '.log')).write_text(result.stdout)
     print(result.stdout, end='', flush=True)
     path = REPORT / 'commands.json'
@@ -148,7 +154,7 @@ def command(label, args, required=True):
 def gradle(label, *tasks):
     return command(label, [str(ROOT / 'gradlew'), '-p', str(HARNESS), '--dependency-verification', 'strict',
                            '-Pandroid.useAndroidX=true', '-Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8',
-                           '--console=plain', *tasks])
+                           '--console=plain', *tasks], split_streams=label == 'instrumented')
 
 
 def verify_scope(changes):
@@ -251,6 +257,7 @@ def build():
                                  '--format', 'json', '--output', str(REPORT / (name + '-vulnerabilities.json')),
                                  str(inventory)])
         license_inventory(inventory, tools)
+    p07_safe('license', p07_license_diagnostics)
 
 
 def write_p06_observer():
@@ -502,7 +509,166 @@ def verify_toolchain():
     })
 
 
+def p07_command(label, args, timeout=12):
+    """Read-only diagnostic, separate from acceptance and never a PASS oracle."""
+    directory = REPORT / 'p07'
+    directory.mkdir(exist_ok=True)
+    row = {'label': label, 'argv': args, 'kind': 'READ_ONLY_DIAGNOSTIC', 'startedUnix': time.time()}
+    try:
+        result = subprocess.run(args, cwd=ROOT, capture_output=True, timeout=timeout, check=False)
+        stdout, stderr = result.stdout, result.stderr
+        row.update(exit=result.returncode, status='OBSERVED' if result.returncode == 0 else 'NOT-VERIFIED')
+    except subprocess.TimeoutExpired as failure:
+        stdout, stderr = failure.stdout or b'', failure.stderr or b''
+        row.update(exit=None, status='NOT-VERIFIED', error='TIMEOUT')
+    except OSError as failure:
+        stdout, stderr = b'', str(failure).encode()
+        row.update(exit=None, status='NOT-VERIFIED', error=type(failure).__name__)
+    row['finishedUnix'] = time.time()
+    for stream, raw in [('stdout', stdout), ('stderr', stderr)]:
+        path = directory / (label + '.' + stream + '.log')
+        path.write_bytes(raw)
+        row[stream] = {'path': str(path.relative_to(ROOT)), 'bytes': len(raw), 'sha256': sha(raw)}
+    index = directory / 'commands.json'
+    rows = json.loads(index.read_text()) if index.exists() else []
+    rows.append(row)
+    index.write_text(json.dumps(rows, indent=2) + '\n')
+    return stdout.decode('utf-8', errors='replace')
+
+
+def p07_safe(phase, action):
+    """Diagnostic failure cannot replace an acceptance failure or waive a gate."""
+    try:
+        action()
+    except Exception as failure:
+        write_json('p07-' + phase + '-collection-error.json', {
+            'status': 'NOT-VERIFIED', 'error': type(failure).__name__, 'detail': str(failure),
+            'acceptanceUnchanged': True,
+        })
+
+
+def p07_snapshot(phase):
+    queries = {
+        'instrumentation': ['shell', 'pm', 'list', 'instrumentation', '-f'],
+        'running-instrumentation': ['shell', 'dumpsys', 'activity', 'instrumentation'],
+        'device': ['shell', 'getprop'],
+        'processes': ['shell', 'ps', '-A'],
+        'log-buffers': ['logcat', '-g'],
+        'runner-logcat': ['logcat', '-d', '-v', 'threadtime', 'AndroidJUnitRunner:V', 'TestRunner:V',
+                          'MonitoringInstr:V', 'AndroidRuntime:V', 'ActivityManager:I', 'PackageManager:I',
+                          'System.err:V', 'art:D', 'dalvikvm:D', 'B2_G2_METRIC:I', '*:S'],
+        'crash-logcat': ['logcat', '-d', '-b', 'crash', '-v', 'threadtime'],
+    }
+    for package in ['com.app.moneymate.b2g2', 'com.app.moneymate.b2g2.test']:
+        queries[package + '-path'] = ['shell', 'pm', 'path', package]
+        queries[package + '-package'] = ['shell', 'dumpsys', 'package', package]
+    for label, args in queries.items():
+        p07_command(phase + '-' + label, ['adb', *args])
+    # Observe installed APKs only; do not install/reinstall/run a second instrumentation.
+    installed = []
+    for package in ['com.app.moneymate.b2g2', 'com.app.moneymate.b2g2.test']:
+        raw = (REPORT / 'p07' / (phase + '-' + package + '-path.stdout.log')).read_text()
+        paths = [line.removeprefix('package:') for line in raw.splitlines() if line.startswith('package:')]
+        item = {'package': package, 'paths': paths, 'classification': 'OBSERVED_INSTALLED' if paths else 'NOT-VERIFIED_NOT_OBSERVED'}
+        item['note'] = 'UTP may install/uninstall between snapshots; absence does not prove it was never installed.'
+        installed.append(item)
+        for index, remote in enumerate(paths):
+            if not remote.startswith('/data/app/') or not remote.endswith('.apk'):
+                continue
+            local = REPORT / 'p07' / (phase + '-' + package + '-' + str(index) + '.apk')
+            p07_command(phase + '-' + package + '-pull-' + str(index), ['adb', 'pull', remote, str(local)])
+            if local.exists():
+                sdk = pathlib.Path(os.environ['ANDROID_HOME']) / 'build-tools/37.0.0'
+                item.setdefault('apks', []).append({'path': str(local.relative_to(ROOT)), 'sha256': sha(local.read_bytes())})
+                p07_command(phase + '-' + package + '-signature-' + str(index),
+                            [str(sdk / 'apksigner'), 'verify', '--print-certs', str(local)])
+    write_json('p07-' + phase + '-installed.json', installed)
+
+
+def p07_apk_diagnostics():
+    sdk = pathlib.Path(os.environ['ANDROID_HOME']) / 'build-tools/37.0.0'
+    rows = []
+    for kind, pattern in [('target', 'release/*.apk'), ('test', 'androidTest/release/*.apk')]:
+        for apk in (HARNESS / 'build/outputs/apk').glob(pattern):
+            row = {'kind': kind, 'path': str(apk.relative_to(ROOT)), 'sha256': sha(apk.read_bytes())}
+            p07_command(kind + '-badging', [str(sdk / 'aapt'), 'dump', 'badging', str(apk)])
+            p07_command(kind + '-manifest', [str(sdk / 'aapt'), 'dump', 'xmltree', str(apk), 'AndroidManifest.xml'])
+            p07_command(kind + '-signature', [str(sdk / 'apksigner'), 'verify', '--print-certs', str(apk)])
+            classes = sorted(apk_classes(apk))
+            row['diagnosticClasses'] = [c for c in classes if any(
+                s in c for s in ['B2G2RuntimeTest', 'AndroidJUnitRunner', 'AndroidJUnit4', 'org/junit/', 'jna/'])]
+            row['classCount'] = len(classes)
+            with zipfile.ZipFile(apk) as archive:
+                row['licenseEntries'] = [n for n in archive.namelist() if re.search(r'license|notice|jna', n, re.I)]
+                for name in archive.namelist():
+                    if re.fullmatch(r'classes\d*\.dex', name):
+                        dex = REPORT / 'p07' / (kind + '-' + name)
+                        dex.write_bytes(archive.read(name))
+                        # No -d disassembly: preserve class/method/annotation metadata for discovery review.
+                        p07_command(kind + '-' + name + '-metadata', [str(sdk / 'dexdump'), '-a', '-f', str(dex)], timeout=30)
+            rows.append(row)
+    write_json('p07-apks.json', rows)
+
+
+def p07_result_index():
+    rows = []
+    build_root = HARNESS / 'build'
+    for directory in ['outputs/androidTest-results', 'reports/androidTests', 'outputs/logs']:
+        for path in (build_root / directory).rglob('*'):
+            if not path.is_file():
+                continue
+            raw = path.read_bytes()
+            rows.append({'path': str(path.relative_to(ROOT)), 'bytes': len(raw), 'sha256': sha(raw)})
+            if directory == 'outputs/logs':
+                destination = REPORT / 'p07' / ('gradle-' + path.name)
+                destination.write_bytes(raw)
+    write_json('p07-connected-results-index.json', {
+        'files': rows, 'note': 'Original XML/PROTO retained by workflow; no generated or substituted test result.',
+        'acceptanceCommand': ':connectedReleaseAndroidTest', 'extraInstrumentationInvocation': False,
+        'discoveryStatus': 'NOT-VERIFIED_UNTIL_RUNNER_AND_DEX_EVIDENCE_REVIEW',
+    })
+
+
+def p07_license_diagnostics():
+    cache = pathlib.Path(os.environ.get('GRADLE_USER_HOME', pathlib.Path.home() / '.gradle')) / 'caches/modules-2/files-2.1'
+    graphs = []
+    for name in ['p06-classpaths.json', 'toolchain-graph.json']:
+        graphs.extend(json.loads((REPORT / name).read_text())['graphs'])
+    rows = []
+    for inventory in ['dependencies.cdx', 'build-logic.cdx']:
+        source = json.loads((REPORT / (inventory + '-license-provenance.json')).read_text())
+        for entry in source['components']:
+            if 'net.java.dev.jna/' not in entry['component'] and entry['status'] != 'NOT-VERIFIED':
+                continue
+            row = {'inventory': inventory, 'original': entry, 'graphMembership': [], 'rawPom': []}
+            for graph in graphs:
+                for component in graph['components']:
+                    purl = 'pkg:maven/' + component['group'] + '/' + component['name'] + '@' + component['version']
+                    if purl == entry['component']:
+                        row['graphMembership'].append(graph['scope'])
+            coordinate = entry['component'].removeprefix('pkg:maven/').replace('@', '/').split('/')
+            if len(coordinate) == 3:
+                group, name, version = coordinate
+                for path in (cache / group / name / version).glob('*/*.pom'):
+                    raw = path.read_bytes()
+                    destination = REPORT / 'p07' / (inventory + '-' + name + '-' + version + '.pom')
+                    destination.parent.mkdir(exist_ok=True)
+                    destination.write_bytes(raw)
+                    root = ET.fromstring(raw)
+                    declarations = []
+                    for node in root.iter():
+                        if node.tag.rsplit('}', 1)[-1] == 'license':
+                            declarations.append({child.tag.rsplit('}', 1)[-1]: child.text for child in node})
+                    row['rawPom'].append({'path': str(destination.relative_to(ROOT)), 'sha256': sha(raw),
+                                          'rootTag': root.tag, 'allNamespaceLicenseDeclarations': declarations})
+            row['assessment'] = 'READ_ONLY_DECLARATIONS_NOT_LEGAL_APPROVAL_NO_INVENTORY_REWRITE'
+            rows.append(row)
+    write_json('p07-license-review.json', rows)
+
+
 def instrument():
+    p07_safe('apk', p07_apk_diagnostics)
+    p07_safe('before', lambda: p07_snapshot('before'))
     command('device-properties', ['adb', 'shell', 'getprop'])
     command('page-size', ['adb', 'shell', 'getconf', 'PAGE_SIZE'], required=False)
     command('device-memory-before', ['adb', 'shell', 'dumpsys', 'meminfo'])
@@ -510,7 +676,11 @@ def instrument():
     emulator = str(pathlib.Path(os.environ['ANDROID_HOME']) / 'emulator/emulator')
     command('emulator-version', [emulator, '-no-window', '-version'])
     command('acceleration', [emulator, '-accel-check'])
-    command('clear-logcat', ['adb', 'logcat', '-c'])
+    try:
+        command('clear-logcat', ['adb', 'logcat', '-c'], split_streams=True)
+    except Exception:
+        p07_safe('clear-failed', lambda: p07_snapshot('clear-failed'))
+        raise
     try:
         gradle('instrumented', ':connectedReleaseAndroidTest')
     finally:
@@ -519,6 +689,8 @@ def instrument():
         rows = [json.loads(line) for line in stream.splitlines() if line.startswith('{')]
         (REPORT / 'metrics.jsonl').write_text(''.join(json.dumps(row) + '\n' for row in rows))
         command('device-memory-after', ['adb', 'shell', 'dumpsys', 'meminfo'], required=False)
+        p07_safe('after', lambda: p07_snapshot('after'))
+        p07_safe('results', p07_result_index)
 
 
 def dex_classes(raw):
