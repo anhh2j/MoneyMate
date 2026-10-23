@@ -17,6 +17,7 @@ REPORT = HARNESS / 'build/reports/b2-g2'
 BASE = '690a74af29897d43fcb9f4c58808ae6ea2e3365f'
 ACCEPTED_B2 = 'be26d275d621c4a0c64ed9dd5fb89cad42bf91b2'
 # G2-P01: Leader6354820006, official PO authorization6355498984.
+# G2-P03: official PO authorization6356299057; only the final metadata record.
 APPROVED_CHECKSUMS = [
     ("androidx.annotation:annotation:1.3.0", "annotation-1.3.0.module",
      "9516c2ae44284ea0bd3d0eade0ee638879b708cbe31e3af92ba96c300604ebc3"),
@@ -38,6 +39,8 @@ APPROVED_CHECKSUMS = [
      "0d94c8a41483e7c2707ebd693e1b1357a84152998ce85550ebbc54ca4321a3a7"),
     ("androidx.tracing:tracing:1.0.0", "tracing-1.0.0.aar",
      "07b8b6139665b884a162eccf97891ca50f7f56831233bf25168ae04f7b568612"),
+    ("org.jetbrains.kotlin:kotlin-stdlib-common:2.4.21", "kotlin-stdlib-common-2.4.21.module",
+     "aeae4f24688e1dd7ebee648ab2b12be685cbe33e9c72bc1439730a794d6e2d5b"),
 ]
 PATHS = [
     'security/b2-g2/settings.gradle.kts',
@@ -59,7 +62,7 @@ def sha(raw):
 
 
 def approved_metadata():
-    """Preserve every baseline byte; insert only the ten reviewed exact records."""
+    """Preserve every baseline byte; insert only ten P01 and one P03 exact records."""
     text = subprocess.check_output(
         ['git', 'show', ACCEPTED_B2 + ':gradle/verification-metadata.xml'], cwd=ROOT,
     ).decode()
@@ -67,9 +70,10 @@ def approved_metadata():
         group, name, version = coordinate.split(':')
         opening = f'      <component group="{group}" name="{name}" version="{version}">'
         entries = [row for row in APPROVED_CHECKSUMS if row[0] == coordinate]
+        approval = 'G2-P03' if coordinate == 'org.jetbrains.kotlin:kotlin-stdlib-common:2.4.21' else 'G2-P01'
         block = ''.join(
             f'         <artifact name="{artifact}">\n'
-            f'            <sha256 value="{digest}" origin="G2-P01 verified upstream bytes"/>\n'
+            f'            <sha256 value="{digest}" origin="{approval} verified upstream bytes"/>\n'
             '         </artifact>\n'
             for _, artifact, digest in entries
         )
@@ -83,8 +87,8 @@ def approved_metadata():
 
 
 def verify_metadata(raw):
-    assert len(APPROVED_CHECKSUMS) == 10 and len(set(APPROVED_CHECKSUMS)) == 10
-    assert raw == approved_metadata(), 'STOP: metadata differs from baseline plus exact G2-P01 ten additions'
+    assert len(APPROVED_CHECKSUMS) == 11 and len(set(APPROVED_CHECKSUMS)) == 11
+    assert raw == approved_metadata(), 'STOP: metadata differs from baseline plus exact ten P01 and one P03 additions'
 
 
 def write_json(name, value):
@@ -123,6 +127,7 @@ def preflight():
     metadata = (HARNESS / 'gradle/verification-metadata.xml').read_bytes()
     verify_metadata(metadata)
     write_json('checksum-policy.json', {'baselineArtifactRecords': 784, 'approvedAdditions': APPROVED_CHECKSUMS,
+                                       'p01Additions': 10, 'p03Additions': 1, 'totalArtifactRecords': 795,
                                        'metadataSha256': sha(metadata), 'strictVerification': True})
     command('java', ['java', '-version'])
     catalog = command('sdk-list', ['sdkmanager', '--list']).stdout

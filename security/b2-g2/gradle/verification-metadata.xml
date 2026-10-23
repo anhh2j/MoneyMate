@@ -3311,5 +3311,10 @@
             <sha256 value="0d94c8a41483e7c2707ebd693e1b1357a84152998ce85550ebbc54ca4321a3a7" origin="G2-P01 verified upstream bytes"/>
          </artifact>
       </component>
+      <component group="org.jetbrains.kotlin" name="kotlin-stdlib-common" version="2.4.21">
+         <artifact name="kotlin-stdlib-common-2.4.21.module">
+            <sha256 value="aeae4f24688e1dd7ebee648ab2b12be685cbe33e9c72bc1439730a794d6e2d5b" origin="G2-P03 verified upstream bytes"/>
+         </artifact>
+      </component>
    </components>
 </verification-metadata>

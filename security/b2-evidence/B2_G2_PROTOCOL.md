@@ -9,11 +9,12 @@ Argon2Kt1.6.0 is implementation only in this disposable test target. The product
 MoneyMate app/security remain unchanged. No PIN/key lifecycle is implemented.
 Catalog is an exact copy from accepted B2 HEAD
 be26d275d621c4a0c64ed9dd5fb89cad42bf91b2. Verification metadata preserves all784
-baseline artifact records/configuration and inserts only the ten G2-P01 records below.
+baseline artifact records/configuration and inserts only ten G2-P01 records and one
+G2-P03 record below, for795 total. Prior ten approved records remain unchanged.
 The guard reconstructs baseline bytes plus precisely those insertions and rejects any
 other delta, including a changed hash/configuration, deletion or unapproved addition.
 The existing build-logic dependency policy is applied without modification.
-No checksums beyond G2-P01, lenient mode, trust wildcard or task workaround.
+No checksums beyond G2-P01/P03, lenient mode, trust wildcard or task workaround.
 Stop and report a blocker if the proposed tasks/checksum policy do not work.
 
 Reproduction uses the repository wrapper with `-p security/b2-g2`, strict verification,
@@ -69,7 +70,8 @@ Independent QA reviews the evidence before Leader decision; keep the new PR Draf
 Authority: PO approval recorded by Leader in Issue16 comment6356080091 (23/10/2026),
 following assessment6355802110 and Leader6355871029. This supersedes the earlier
 read-only pause only within the approved eleven paths. Option A's sixteen compiler2.2.10
-checksums are not approved and must not be added. Metadata stays784+10, byte-exact.
+checksums are not approved and must not be added. G2-P03 below authorizes precisely
+one later metadata insertion; all784+10 previous records/configuration stay byte-exact.
 
 Standalone buildscript explicitly requests KGP2.4.21, matching baseline main690a74af's
 resolved buildscript and app/security compiler/BTA configurations. AGP stays9.4.1;
@@ -89,6 +91,28 @@ Any differing selected toolchain version, new checksum or need for a path outsid
 authorized scope is STOP/report. Subsequent build/security/license/runtime gates must
 be reported separately; compiler parity is not G2 runtime or production acceptance.
 The four-cell workflow,30-minute limits,three-day retention and all prior gates remain.
+
+## G2-P03 exact checksum delta
+
+Authority: official PO authorization Issue16 comment6356299057 (23/10/2026), accepting
+Leader6356290692 and the blocker evidenced in Developer6356251256. Only standalone
+metadata, this protocol and the inspector checksum guard change; no twelfth path.
+
+Coordinate `org.jetbrains.kotlin:kotlin-stdlib-common:2.4.21`, artifact
+`kotlin-stdlib-common-2.4.21.module`, SHA256
+`aeae4f24688e1dd7ebee648ab2b12be685cbe33e9c72bc1439730a794d6e2d5b`.
+Upstream bytes: https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-common/2.4.21/kotlin-stdlib-common-2.4.21.module
+Read626 bytes independently over HTTPS and verify SHA256 against the exact PO value;
+also compare SHA1 with the upstream `.sha1` response:
+`e874d771dc445b01a30fb832f22f4f6666aa5dfa`. Matching hashes do not replace security/license review.
+
+The guard reconstructs accepted baseline bytes plus precisely ten unchanged P01 insertions
+and this one P03 insertion. Negative controls must reject changed baseline/P01/P03 hashes,
+deleted records, unapproved additions and changed verification configuration. Metadata
+contains795 artifact records; strict verification, catalog and2.4.21 parity gate are unchanged.
+Reproduce the four workflow cells using the existing preflight/build/instrument/inspect
+modes above, retaining graph, manifest, source, exit codes and all runtime/security evidence.
+Any other missing artifact or blocker is STOP/report, not authority for another insertion.
 
 ## G2-P01 exact checksum delta
 
