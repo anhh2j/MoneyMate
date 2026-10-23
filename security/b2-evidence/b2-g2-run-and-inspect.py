@@ -1551,7 +1551,7 @@ def p11_validate_facts(target, test, selected, errors, canary_removed):
             failures.append('TARGET_CLASS_MISSING:' + owner); continue
         if bool(actual['flags'] & 0x200) != (kind == 'interface'):
             failures.append('CLASS_KIND:' + owner)
-        if actual['superclass'] != expected['superclass'] or actual['interfaces'] != expected['interfaces']:
+        if actual['superclass'] != expected['superclass'] or set(actual['interfaces']) != set(expected['interfaces']):
             failures.append('HIERARCHY:' + owner)
         member_rows = []
         for field, signatures in [(False, methods), (True, fields)]:
@@ -1572,6 +1572,18 @@ def p11_validate_facts(target, test, selected, errors, canary_removed):
     return failures, rows
 
 
+def p11_mapping_facts(mapping, target):
+    failures, rows = [], []
+    for name in P11_ROOTS:
+        match = re.search(r'^' + re.escape(name) + r' -> ([^\s]+):$', mapping, re.M)
+        actual = p11_descriptor(name) in target
+        if not actual or (match and match.group(1) != name): failures.append('ROOT_MAPPING_NAME:' + name)
+        rows.append(dict(original=name, mappingName=match.group(1) if match else None,
+                         actualOriginalDefinition=actual,
+                         evidence='MAPPING_AND_ACTUAL_DEX' if match else 'NO_MAPPING_HEADER_ACTUAL_DEX_REQUIRED'))
+    return failures, rows
+
+
 def p11_negative_controls(selected):
     # Synthetic facts only: do not edit APKs, source, JARs, inputs or acceptance.
     clone = lambda x: json.loads(json.dumps(x))
@@ -1579,6 +1591,10 @@ def p11_negative_controls(selected):
         methods={m['name'] + m['descriptor']: dict(flags=m['flags']) for m in body['methods']},
         fields={m['name'] + ':' + m['descriptor']: m['flags'] for m in body['fields']}) for owner, body in selected.items()}
     assert not p11_validate_facts(target, {}, selected, [], True)[0]
+    reordered = clone(target)
+    for info in reordered.values(): info['interfaces'].reverse()
+    assert not p11_validate_facts(reordered, {}, selected, [], True)[0], 'Interface order is not ABI identity'
+    assert not p11_mapping_facts('', target)[0], 'A mapping header is optional; actual original DEX identity is mandatory'
     rows = []
     for case in ['missing-class', 'renamed-member', 'static-drift', 'broken-hierarchy', 'test-duplicate',
                  'canary-present', 'decode-error']:
@@ -1612,6 +1628,8 @@ def p11_negative_controls(selected):
         try: p11_program_provider(inputs)
         except AssertionError: rows.append(dict(case=case, result='REJECTED'))
         else: raise AssertionError('P11 input control accepted ' + case)
+    assert p11_mapping_facts('kotlin.LazyKt -> x.a:\n', target)[0]
+    rows.append(dict(case='renamed-mapping', result='REJECTED'))
     return rows
 
 
@@ -1693,14 +1711,14 @@ def p11_verify():
         collisions = sorted(set(definitions['target']) & set(definitions['test']))
         if collisions: failures.append('CROSS_APK_CLASS_COLLISIONS')
         mapping_path = HARNESS / 'build/outputs/mapping/release/mapping.txt'; mapping = mapping_path.read_text()
-        for name in P11_ROOTS:
-            if not re.search(r'^' + re.escape(name) + r' -> ' + re.escape(name) + r':$', mapping, re.M):
-                failures.append('ROOT_MAPPING_NAME:' + name)
+        mapping_failures, mapping_rows = p11_mapping_facts(mapping, definitions['target'])
+        failures.extend(mapping_failures)
         report.update(failures=failures, rootDefinitions=rows, rootCrossApkLinkage=linkage,
                       deferredConditionalReferences=deferred, collisions=collisions, apks=apks,
                       testProgramRootLeaks=test_program_roots,
                       testR8Inputs=dict(path=str(test_input_path.relative_to(ROOT)), sha256=sha(test_input_path.read_bytes())),
                       mapping=dict(path=str(mapping_path.relative_to(ROOT)), sha256=sha(mapping_path.read_bytes())),
+                      rootMappingEvidence=mapping_rows,
                       canaryRemoved=trace['facts']['canaryRemoved'], decodeErrors=errors,
                       note='Bounded selected runner ABI only; runtime 5 tests/20 metrics and all old gates remain mandatory.')
         report['status'] = 'PASS' if not failures else 'FAIL'

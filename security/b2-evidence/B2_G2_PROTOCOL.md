@@ -531,18 +531,24 @@ trước instrumentation. Nó không nằm trong safe diagnostic wrapper. Kiểm
   visibility/static/abstract ABI. Thu `javap -p -s -c` cả12 classes trong CI P07 manifest,
   không còn chỉ dựa local supplement P10.
 - Actual class_defs/class_data của mọi DEX target/test; decode errors là FAIL;12 original
-  class identities/hierarchy và exact member owners/flags phải còn ở target, identity
-  mapping phải không đổi. LazyKt.lazy phải resolve qua hierarchy tới LazyKt__LazyJVMKt.
+  class identities/hierarchy và exact member owners/flags phải còn ở target. Mapping
+  header nếu có phải giữ identity; thiếu header không thay actual original definition
+  (R8 có thể không ghi header cho facade không còn member). Không chấp nhận chỉ có
+  reference/type_id. LazyKt.lazy phải resolve qua hierarchy tới LazyKt__LazyJVMKt.
+  Interface hierarchy so theo tập hợp: DEX có thể sắp xếp interface khác classfile;
+  positive control đảo thứ tự phải vẫn qua, không nhầm encoding order với ABI.
 - Actual test invoke/field sites trên ABI roots phải resolve đúng final target members;
   roots không có trong test program input/DEX; collision0; canary vẫn bị loại.
 - Inspector cuối đối chiếu lại source/keep/APK hashes với oracle; không chấp nhận report
   cũ hoặc APK bị thay. Mọi5 tests/20 metrics/JNI/KAT/ABI/page/memory/signing/security gate
   cũ giữ nguyên, oracle PASS không thay runtime acceptance.
 
-14 negative controls thuần dữ liệu: missing class, member bị đổi tên/mất, static drift,
+15 negative controls thuần dữ liệu: missing class, member bị đổi tên/mất, static drift,
 broken hierarchy, duplicate test class, canary retained, decode error, blanket rule,
 dontwarn, member rule removed, library-only provider, hash drift, mutating observer,
-duplicate program provider. Không mutate APK/build/source/input trong controls.
+duplicate program provider, renamed mapping. Positive controls chấp nhận đảo thứ tự
+interface và thiếu mapping header khi actual original class_def hiện diện. Không
+mutate APK/build/source/input trong controls.
 
 Giới hạn: oracle chỉ xác minh bounded ABI theo bảng, không complete shared-runtime
 closure. Ví dụ Intrinsics.areEqual từ đường conditional khác không tự thành keep;
@@ -554,3 +560,11 @@ checksum/toolchain hoặc ngoài3 path: giữ raw evidence và STOP, không nố
 Rerun4 cell30m/cell và CI nền cùng HEAD, artifact3 ngày; không bỏ gate API26 clear-logcat
 hay biến G2 FAIL thành PASS. Permission/apksigner/aapt/license/legal vẫn OPEN ngoài P11.
 QA độc lập trước Leader review; PR17/18 Draft, không Ready/merge/tag/release/production.
+
+Lịch sử oracle P11: HEAD4185b47/run39932999378 bị gate từ chối vì bắt buộc mapping
+header cho LazyKt, dù class_def gốc/hierarchy/member linkage đều có thật; API35-16KiB
+artifact12491922815 ZIP SHA256346dc83d7cee1dd8e8ca036b8e299b9beca3dd227f949ba22ee019c645835aeb
+giữ raw FAIL. Đây là lỗi oracle trước instrumentation, không phải crash runtime mới.
+Đã sửa chỉ inspector/protocol: actual original class_def bắt buộc, header nếu có không
+được rename; thêm renamed-mapping negative và2 positive boundary controls. Keep byte
+không đổi. Lần chạy lại tại HEAD sửa oracle mới là bằng chứng để bàn giao P11.
