@@ -947,7 +947,15 @@ P10_WIDTHS = '112312312311111111123223522321122122333112333222222222222222220000
 
 
 def p10_types(descriptor):
-    return re.findall(r'L[^;]+;', descriptor)
+    # Member identifiers are not descriptors: getClassLoader()/LEVEL must not create
+    # fictitious types beginning at the 'L' in the identifier.
+    if '(' in descriptor:
+        descriptor = descriptor[descriptor.index('('):]
+    elif ':' in descriptor:
+        descriptor = descriptor.split(':', 1)[1]
+    found = re.findall(r'L[^;]+;', descriptor)
+    assert all(re.fullmatch(r'L[^;():\[\]]+;', name) for name in found), 'Invalid diagnostic descriptor'
+    return found
 
 
 def p10_dex(raw, source):
@@ -971,6 +979,7 @@ def p10_dex(raw, source):
         _, o = leb(u32(u32(60) + i * 4))
         strings.append(raw[o:raw.index(b'\x00', o)].decode('utf-8', errors='replace'))
     types = [strings[u32(u32(68) + i * 4)] for i in range(u32(64))]
+    known_types = {t.lstrip('[') for t in types}
 
     def typelist(o):
         return [] if not o else [types[u16(o + 4 + i * 2)] for i in range(u32(o))]
@@ -995,6 +1004,7 @@ def p10_dex(raw, source):
 
     def add(type_name, kind, owner, member='', target_member='', pc=None, line=None, detail=''):
         for base in p10_types(type_name):
+            assert base in known_types, 'P10 reference is not an actual DEX type: ' + base
             refs.append(dict(type=base, kind=kind, owner=owner, member=member, referencedMember=target_member,
                              dexPc=pc, dexLine=line, detail=detail))
 
@@ -1214,6 +1224,11 @@ def p10_negative_controls():
         ('provider-unknown', p10_classification('LX;', site('FIELD_SIGNATURE'), set(), set(), False)[0], 'UNKNOWN'),
         ('signature-not-executed', p10_classification('LX;', site('METHOD_SIGNATURE'), set(), set(), True)[0], 'CONDITIONAL'),
         ('debug-only', p10_classification('LX;', site('DEBUG_METADATA'), set(), set(), True)[0], 'ANNOTATION-METADATA'),
+        ('method-name-L', p10_types('getClassLoader()Ljava/lang/ClassLoader;'), ['Ljava/lang/ClassLoader;']),
+        ('field-name-L', p10_types('LEVEL:Ljava/lang/String;'), ['Ljava/lang/String;']),
+        ('primitive-method-name-L', p10_types('nativeLoad()V'), []),
+        ('array-parameter-return', p10_types('load(Ljava/lang/String;[Lfoo/Bar;)Lkotlin/Unit;'),
+         ['Ljava/lang/String;', 'Lfoo/Bar;', 'Lkotlin/Unit;']),
     ]
     for case, reader in [('reject-non-dex', lambda: p10_dex(b'not-a-dex', {})),
                          ('reject-non-classfile', lambda: p10_classfile(b'not-a-classfile'))]:

@@ -421,7 +421,10 @@ annotation encoded values được xử lý riêng. Opcode/container không hỗ
 lỗi ghi coverage PARTIAL/NOT-VERIFIED, không đoán reference. Descriptor strings trong
 Kotlin Metadata không tự biến thành runtime type use. 9 classification controls chặn
 nhầm static invoke/signature/annotation/type-pool/provider-unknown thành observed need;
-thêm2 format controls từ chối non-DEX/non-classfile, tổng11 controls diagnostic.
+thêm2 format controls từ chối non-DEX/non-classfile và4 descriptor controls, tổng15.
+Parser tách tên member trước khi đọc descriptor; ký tự L trong getClassLoader/LEVEL/
+nativeLoad không tạo type. Mọi reference phải nằm trong actual DEX type_ids (chuẩn hóa
+array component), nếu không phải báo decode error, không đưa type giả vào closure.
 
 Định nghĩa classification:
 - REQUIRED: missing class trong crash của đúng PID harness, hoặc superclass/interface
