@@ -222,8 +222,13 @@ def build():
     assert all(re.search(r'^' + name + r'(?:\s|$)', tasks, re.M) for name in expected), 'STOP: task graph mismatch'
     gradle('toolchain', ':exportB2G2Toolchain')
     verify_toolchain()
-    gradle('build', ':minifyReleaseWithR8', ':assembleRelease', ':assembleReleaseAndroidTest',
-           ':lintRelease', ':exportB2G2Inventory', ':build-logic:exportBuildDependencies')
+    observer = write_p06_observer()
+    try:
+        gradle('build', '--init-script', str(observer), ':minifyReleaseWithR8', ':assembleRelease', ':assembleReleaseAndroidTest',
+               ':lintRelease', ':exportB2G2Inventory', ':build-logic:exportBuildDependencies')
+    finally:
+        if (REPORT / 'p06-r8-inputs.json').exists():
+            verify_test_resolution()
     gradle('target-dependencies', ':dependencies', '--configuration', 'releaseRuntimeClasspath')
     gradle('test-dependencies', ':dependencies', '--configuration', 'releaseAndroidTestRuntimeClasspath')
     gradle('test-errorprone-insight', ':dependencyInsight', '--dependency', 'com.google.errorprone:error_prone_annotations',
@@ -248,17 +253,112 @@ def build():
         license_inventory(inventory, tools)
 
 
+def write_p06_observer():
+    """Generated evidence-only init script; reads task inputs without changing their wiring."""
+    path = REPORT / 'p06-observe-inputs.init.gradle'
+    path.write_text(r'''
+import groovy.json.JsonOutput
+import java.security.MessageDigest
+import java.util.zip.ZipFile
+
+def digest = { byte[] bytes -> MessageDigest.getInstance('SHA-256').digest(bytes).encodeHex().toString() }
+def annotations = ['com/google/errorprone/annotations/CanIgnoreReturnValue.class',
+                   'com/google/errorprone/annotations/MustBeClosed.class']
+def describe = { File file ->
+    def found = []
+    if (file.isDirectory()) {
+        file.eachFileRecurse { child ->
+            if (child.isFile()) {
+                def relative = file.toPath().relativize(child.toPath()).toString().replace('\\', '/')
+                if (relative.startsWith('com/google/errorprone/annotations/') && relative.endsWith('.class')) found.add(relative)
+            }
+        }
+    } else if (file.isFile() && file.name.endsWith('.jar')) {
+        def archive = new ZipFile(file)
+        try {
+            archive.entries().each { entry ->
+                if (entry.name.startsWith('com/google/errorprone/annotations/') && entry.name.endsWith('.class')) found.add(entry.name)
+            }
+        } finally { archive.close() }
+    }
+    [path: file.absolutePath, kind: file.isDirectory() ? 'directory' : 'file', exists: file.exists(),
+     sha256: file.isFile() ? digest(file.bytes) : null, errorProneClasses: found.sort()]
+}
+def readInputFiles = { task, String getter ->
+    def type = task.class
+    def method = null
+    while (type != null && method == null) {
+        method = type.declaredMethods.find { it.parameterCount == 0 && (it.name == getter || it.name.startsWith(getter + '$')) }
+        type = type.superclass
+    }
+    if (method == null) throw new IllegalStateException('Cannot observe R8 getter: ' + getter)
+    method.accessible = true
+    def value = method.invoke(task)
+    if (!(value instanceof Iterable)) throw new IllegalStateException('R8 input is not iterable: ' + getter)
+    value.collect { File file -> describe(file) }
+}
+gradle.taskGraph.beforeTask { task ->
+    if (task.project.rootProject.name != 'MoneyMate-B2-G2-Test-Only' || task.path != ':minifyReleaseAndroidTestWithR8') return
+    def output = new File(task.project.rootProject.projectDir, 'build/reports/b2-g2')
+    output.mkdirs()
+    def scopes = ['releaseAndroidTestCompileClasspath', 'releaseAndroidTestRuntimeClasspath', 'releaseRuntimeClasspath']
+    def graphs = scopes.collect { scope ->
+        def configuration = task.project.configurations.getByName(scope)
+        def result = configuration.incoming.resolutionResult
+        [scope: scope, components: result.allComponents.findAll { it.moduleVersion != null }.collect {
+            [group: it.moduleVersion.group, name: it.moduleVersion.name, version: it.moduleVersion.version]
+        }, selectionReasons: result.allComponents.collect {
+            [id: it.id.displayName, reasons: it.selectionReason.descriptions.collect { reason -> reason.description }]
+        }, edges: result.allDependencies.collect {
+            [from: it.from.id.displayName, requested: it.requested.displayName, selected: it.selected.id.displayName]
+        }]
+    }
+    new File(output, 'p06-classpaths.json').text = JsonOutput.toJson([graphs: graphs, capturedBeforeTask: task.path])
+    def evidence = [task: task.path, taskType: task.class.name, stage: 'BEFORE_TEST_R8', status: 'NOT-VERIFIED',
+                    mutatesTaskInputs: false]
+    try {
+        evidence.referencedClasses = readInputFiles(task, 'getReferencedClasses')
+        evidence.programClasses = readInputFiles(task, 'getProgramClasses')
+        evidence.bootClasspath = readInputFiles(task, 'getBootClasspath')
+        evidence.status = 'OBSERVED'
+    } catch (Exception failure) {
+        evidence.observationError = failure.toString()
+    }
+    new File(output, 'p06-r8-inputs.json').text = JsonOutput.toJson(evidence)
+    def libraries = evidence.referencedClasses ?: []
+    def programs = evidence.programClasses ?: []
+    def provided = libraries.any { row -> annotations.every { row.errorProneClasses.contains(it) } }
+    if (evidence.status != 'OBSERVED' || !provided || programs.any { !it.errorProneClasses.isEmpty() }) {
+        throw new IllegalStateException('STOP P06: Error Prone R8 referenced/library input not verified or leaked into program classes')
+    }
+}
+'''.lstrip())
+    return path
+
+
+def validate_p06_inputs(graphs, inputs):
+    expected = {'releaseAndroidTestCompileClasspath': {'2.36.0'},
+                'releaseAndroidTestRuntimeClasspath': set(), 'releaseRuntimeClasspath': set()}
+    assert len(graphs) == 3 and {g['scope'] for g in graphs} == set(expected)
+    for graph in graphs:
+        versions = {c['version'] for c in graph['components'] if c['group'] == 'com.google.errorprone'
+                    and c['name'] == 'error_prone_annotations'}
+        assert versions == expected[graph['scope']], f"STOP P06: {graph['scope']} selected {versions}"
+    assert inputs['status'] == 'OBSERVED' and inputs['stage'] == 'BEFORE_TEST_R8'
+    assert inputs['task'] == ':minifyReleaseAndroidTestWithR8' and inputs['mutatesTaskInputs'] is False
+    assert not any(row['errorProneClasses'] for row in inputs['programClasses']), 'Error Prone in test R8 program inputs'
+    library_rows = [row for row in inputs['referencedClasses'] if row['errorProneClasses']]
+    assert any(row['sha256'] == '77440e270b0bc9a249903c5a076c36a722c4886ca4f42675f2903a1c53ed61a5'
+               and all(name.replace('.', '/') + '.class' in row['errorProneClasses'] for name in P05_CLASSES)
+               for row in library_rows), 'Pinned Error Prone JAR not observed as R8 library input'
+
+
 def verify_test_resolution():
     coordinate = 'com.google.errorprone:error_prone_annotations:2.36.0'
-    target = (REPORT / 'target-dependencies.log').read_text()
-    test = (REPORT / 'test-dependencies.log').read_text()
-    compile_graph = (REPORT / 'test-errorprone-insight.log').read_text()
-    assert 'com.google.errorprone:error_prone_annotations:' not in target, 'Test dependency leaked into target graph'
-    assert coordinate in test and coordinate in compile_graph, 'Missing P05 test compile/runtime resolution'
-    pattern = r'com\.google\.errorprone:error_prone_annotations:([0-9][^\s]*)(?:\s+->\s+(\S+))?'
-    for graph in [test, compile_graph]:
-        selected = {replacement or requested for requested, replacement in re.findall(pattern, graph)}
-        assert selected == {'2.36.0'}, f'STOP: P05 test selected versions {selected}'
+    graph_path, input_path = REPORT / 'p06-classpaths.json', REPORT / 'p06-r8-inputs.json'
+    graphs = json.loads(graph_path.read_text())['graphs']
+    inputs = json.loads(input_path.read_text())
+    validate_p06_inputs(graphs, inputs)
     cache = pathlib.Path(os.environ.get('GRADLE_USER_HOME', pathlib.Path.home() / '.gradle')) / 'caches/modules-2/files-2.1'
     jars = list((cache / 'com.google.errorprone/error_prone_annotations/2.36.0').glob('*/error_prone_annotations-2.36.0.jar'))
     assert jars, 'No resolved P05 JAR'
@@ -269,11 +369,11 @@ def verify_test_resolution():
         with zipfile.ZipFile(jar) as archive:
             assert all(name.replace('.', '/') + '.class' in archive.namelist() for name in P05_CLASSES)
         hashes.append({'file': jar.name, 'sha256': digest, 'classesPresent': P05_CLASSES})
-    write_json('p05-test-resolution.json', {
-        'authority': 'Issue16 comment6357366408', 'status': 'PASS', 'coordinate': coordinate,
-        'targetRuntimeAbsent': True, 'testCompileAndRuntimePresent': True, 'jarArtifacts': hashes,
-        'graphLogs': {name: sha((REPORT / name).read_bytes()) for name in [
-            'target-dependencies.log', 'test-dependencies.log', 'test-errorprone-insight.log']},
+    write_json('p06-test-resolution.json', {
+        'authority': 'Issue16 comment6358851194', 'status': 'PASS', 'coordinate': coordinate,
+        'targetRuntimeAbsent': True, 'testCompilePresent': True, 'testRuntimeAbsent': True,
+        'testR8ReferencedInputPresent': True, 'testR8ProgramInputAbsent': True, 'jarArtifacts': hashes,
+        'graphSha256': sha(graph_path.read_bytes()), 'r8InputSha256': sha(input_path.read_bytes()),
     })
 
 
@@ -550,11 +650,11 @@ def inspect():
         match = re.search(r'^' + re.escape(original) + r' -> ([^\s]+):$', test_mapping, re.M)
         renamed = match.group(1) if match else original
         present = 'L' + renamed.replace('.', '/') + ';' in test_classes
+        assert not present, 'P06 compile-only annotation packaged in test DEX'
         annotation_classes.append({
             'original': original, 'mappedName': renamed, 'presentInTestDex': present,
             'listedInTestUsage': original in test_usage,
-            'classification': 'RETAINED_IN_TEST_DEX' if present else (
-                'REMOVED_BY_TEST_R8' if original in test_usage else 'NOT-VERIFIED'),
+            'classification': 'ABSENT_COMPILE_ONLY',
         })
     test_minification = {
         'taskLog': test_r8,
@@ -564,14 +664,16 @@ def inspect():
         ) else 'NOT-VERIFIED',
     }
     assert test_minification['classification'] == 'R8_TASK_EXECUTED', 'Test APK R8 not verified'
-    write_json('p05-apk-isolation.json', {
-        'testResolution': json.loads((REPORT / 'p05-test-resolution.json').read_text()),
+    assert not any(name.startswith('Lcom/google/errorprone/annotations/') for name in test_classes)
+    assert not re.search(r'^com\.google\.errorprone\.annotations\.', test_mapping, re.M)
+    write_json('p06-apk-isolation.json', {
+        'testResolution': json.loads((REPORT / 'p06-test-resolution.json').read_text()),
         'targetErrorProneDependencyAbsent': True, 'annotationClasses': annotation_classes,
         'testUsageFiles': [{'path': str(path.relative_to(ROOT)), 'sha256': sha(path.read_bytes())}
                            for path in test_usage_paths],
         'targetApkSha256': sha(target.read_bytes()), 'testApkSha256': sha(test.read_bytes()),
         'testApkR8': test_minification,
-        'note': 'Annotation retention/removal is observed separately from classpath availability and JNI/KAT execution.',
+        'note': 'P06: compile/library-only annotations absent from runtime graphs and both program DEX; JNI/KAT checked separately.',
     })
     write_json('summary.json', {
         'source': json.loads((REPORT / 'source.json').read_text()), 'cell': os.environ['G2_CELL'],

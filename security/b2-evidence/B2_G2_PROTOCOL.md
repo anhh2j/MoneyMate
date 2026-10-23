@@ -199,3 +199,39 @@ classpath evidence is not used to invent post-R8 class presence or runtime JNI P
 Existing provider-in-target/provider-absent-from-test, matching signatures, KAT/JUnit,
 page-size/memory, strict lint/security/license gates remain mandatory. No dontwarn,
 blanket keep, task bypass, new checksum or production dependency is authorized.
+
+## G2-P06 compile-only/reference input experiment and legacy backup
+
+Authority: PO Issue16 comment6358851194 (23/10/2026), accepting Leader6358829389
+and QA6358792966. Only build.gradle.kts, harness manifest, inspector and this protocol
+change. Replace the P05 Error Prone declaration with androidTestCompileOnly for the
+same alias2.36.0. Add fullBackupContent=false for API26-30; allowBackup=false,
+dataExtractionRules exclusions/icon/permissions remain unchanged. Catalog P05 exact
+insertion,795 checksum records,12-path allowlist/KAT/keep rules/workflow stay unchanged.
+
+This section explicitly supersedes P05's test-runtime-presence oracle. Error Prone must
+be selected2.36.0 in test compile classpath, absent from test/target runtime and both
+program DEX, and present as an actual referenced/library input of test R8. The same
+pinned JAR must provide the two annotation class files; no JDK enum/stub is packaged.
+No classpath declaration or aggregate SBOM alone proves this role.
+
+The inspector generates p06-observe-inputs.init.gradle inside build/reports/b2-g2 as
+reproducible evidence, not a tracked source path. A beforeTask observer reads the actual
+minifyReleaseAndroidTestWithR8 referencedClasses/programClasses/bootClasspath and
+resolved compile/runtime graph, without changing inputs, R8 options, rules or task wiring.
+It writes p06-classpaths.json and p06-r8-inputs.json BEFORE test R8 runs, retaining
+requested/selected edges, selection reasons, file paths/SHA256 and annotation entries.
+If no library input is observed, or the JAR leaks into program classes, it records failure
+and stops. The Python validator checks exact scopes/versions, pinned library hash/classes
+and program absence; p06-test-resolution.json PASS means input wiring only, not R8 success.
+A build failure still leaves observer evidence; if the task was never reached the input
+role stays NOT-VERIFIED, never guessed. The generated observer performs no file admission.
+
+On completed runtime inspection, p06-apk-isolation.json additionally requires annotation
+absence from both target/test DEX and mappings, test R8 execution, and unchanged provider
+isolation/signature/KAT/JUnit/environment gates. No annotation runtime-presence expectation
+from P05 is retained. Missing classes, missing library input, parity drift/new artifact or
+out-of-scope need means STOP/report; no dontwarn, task disable or fallback is authorized.
+All four cells must provide actual lint XML and runtime/security/license evidence, with
+CI at the new HEAD. Infrastructure retry may be recorded by run/attempt; old CI PASS is
+not substituted. PR17/18 remain Draft; ARM64/kernel16KiB/native OOM remain OPEN.
