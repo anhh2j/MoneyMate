@@ -1,0 +1,105 @@
+name: T20 B2-G2 isolated minified x86 experiment
+
+on:
+  push:
+    branches: [spike/T20-B2-G2-x86-compat]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: b2-g2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime:
+    name: G2 ${{ matrix.cell }} x86_64
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cell: r8-api26
+            api: 26
+            target: default
+            ram: 2048
+            heap: 256
+          - cell: r8-api35
+            api: 35
+            target: default
+            ram: 2048
+            heap: 256
+          - cell: ps16k-api35
+            api: 35
+            target: google_apis_ps16k
+            ram: 2048
+            heap: 256
+          - cell: memory35
+            api: 35
+            target: default
+            ram: 1536
+            heap: 128
+    env:
+      G2_CELL: ${{ matrix.cell }}
+      G2_API: ${{ matrix.api }}
+      G2_TARGET: ${{ matrix.target }}
+      G2_RAM: ${{ matrix.ram }}
+      G2_HEAP: ${{ matrix.heap }}
+      G2_TOOLS: ${{ runner.temp }}/b2-g2-tools
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          cmdline-tools-version: 13114758
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
+        with:
+          validate-wrappers: true
+      - name: Install baseline SDK and record approved scope
+        run: |
+          sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "platform-tools"
+          python3 security/b2-evidence/b2-g2-run-and-inspect.py preflight
+      - name: Strict task preflight, minified harness build and security scans
+        run: python3 security/b2-evidence/b2-g2-run-and-inspect.py build
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: ${{ matrix.target }}
+          ram-size: ${{ matrix.ram }}M
+          heap-size: ${{ matrix.heap }}
+          emulator-build: '16428233'
+          channel: stable
+          disable-animations: true
+          script: python3 security/b2-evidence/b2-g2-run-and-inspect.py instrument
+      - name: Verify R8, DEX separation, JUnit, page size, memory, signatures and hashes
+        run: python3 security/b2-evidence/b2-g2-run-and-inspect.py inspect
+      - name: Upload actual evidence including failures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: b2-g2-${{ matrix.cell }}-x86_64
+          retention-days: 3
+          if-no-files-found: error
+          path: |
+            security/b2-g2/build/reports/
+            security/b2-g2/build/outputs/androidTest-results/
+            security/b2-g2/build/outputs/apk/
+            security/b2-g2/build/outputs/mapping/
+            security/b2-g2/build/reports/dependency-verification/
+            build/reports/dependency-verification/
