@@ -507,8 +507,9 @@ def instrument():
     command('page-size', ['adb', 'shell', 'getconf', 'PAGE_SIZE'], required=False)
     command('device-memory-before', ['adb', 'shell', 'dumpsys', 'meminfo'])
     command('kernel', ['adb', 'shell', 'uname', '-a'])
-    command('emulator-version', ['emulator', '-version'])
-    command('acceleration', ['emulator', '-accel-check'])
+    emulator = str(pathlib.Path(os.environ['ANDROID_HOME']) / 'emulator/emulator')
+    command('emulator-version', [emulator, '-version'])
+    command('acceleration', [emulator, '-accel-check'])
     command('clear-logcat', ['adb', 'logcat', '-c'])
     try:
         gradle('instrumented', ':connectedReleaseAndroidTest')
