@@ -8,3 +8,40 @@
     public static void endSection();
     public static void forceEnableAppTracing();
 }
+
+# P11: exact runner initialization ABI; PO6361729695, bytecode evidence P10.
+-keep class kotlin.jvm.internal.Lambda {
+    public <init>(int);
+    public int getArity();
+}
+-keep interface kotlin.jvm.internal.FunctionBase {
+    public int getArity();
+}
+-keep interface kotlin.Function {
+}
+-keep interface kotlin.jvm.functions.Function0 {
+    public java.lang.Object invoke();
+}
+-keep interface kotlin.Lazy {
+    public java.lang.Object getValue();
+}
+-keep class kotlin.LazyKt {
+}
+-keep class kotlin.LazyKt__LazyKt {
+}
+-keep class kotlin.LazyKt__LazyJVMKt {
+    public static kotlin.Lazy lazy(kotlin.jvm.functions.Function0);
+}
+-keep class kotlin.SynchronizedLazyImpl {
+    public <init>(kotlin.jvm.functions.Function0,java.lang.Object);
+    public <init>(kotlin.jvm.functions.Function0,java.lang.Object,int,kotlin.jvm.internal.DefaultConstructorMarker);
+    public java.lang.Object getValue();
+}
+-keep class kotlin.UNINITIALIZED_VALUE {
+    public static final kotlin.UNINITIALIZED_VALUE INSTANCE;
+}
+-keep class kotlin.jvm.internal.Intrinsics {
+    public static void checkNotNullParameter(java.lang.Object,java.lang.String);
+}
+-keep class kotlin.jvm.internal.DefaultConstructorMarker {
+}

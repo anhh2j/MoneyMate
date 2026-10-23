@@ -239,6 +239,8 @@ def preflight():
     verify_metadata(metadata)
     guard_negative_controls(metadata)
     p08_negative_controls()
+    baseline_keep = subprocess.check_output(['git', 'show', P11_BASE_HEAD + ':security/b2-g2/proguard-rules.pro'], cwd=ROOT)
+    p11_rule_policy((HARNESS / 'proguard-rules.pro').read_bytes(), baseline_keep)
     write_json('checksum-policy.json', {'baselineArtifactRecords': 784, 'approvedAdditions': APPROVED_CHECKSUMS + [P09_CHECKSUM],
                                        'p01Additions': 10, 'p03Additions': 1, 'p09Additions': 1, 'totalArtifactRecords': 796,
                                        'p09Authority': 'Issue16 comment6360301889',
@@ -297,6 +299,7 @@ def build():
         license_inventory(inventory, tools)
     p07_safe('license', p07_license_diagnostics)
     p07_safe('p10-build', lambda: p10_closure('build'))
+    p11_verify()
 
 
 def write_p06_observer():
@@ -1461,7 +1464,257 @@ def p10_closure(phase):
 
 
 
+# P11 exact ABI roots: PO6361729695 / Leader6361701203; selected classfile evidence P10.
+P11_BASE_HEAD = '55f2da131ccefd8c8c86c0ed3dbef344ec070c96'
+P11_STDLIB_SHA = 'bd8250210584cb659847dce9cda660f8e9906e5def7fbebcea93dc6dcb6a88a3'
+# JVM descriptor -> explicit ProGuard member; empty dictionaries mean class identity only.
+P11_ROOTS = {
+    'kotlin.jvm.internal.Lambda': ('class', {
+        '<init>(I)V': 'public <init>(int);', 'getArity()I': 'public int getArity();'}, {}),
+    'kotlin.jvm.internal.FunctionBase': ('interface', {'getArity()I': 'public int getArity();'}, {}),
+    'kotlin.Function': ('interface', {}, {}),
+    'kotlin.jvm.functions.Function0': ('interface', {'invoke()Ljava/lang/Object;': 'public java.lang.Object invoke();'}, {}),
+    'kotlin.Lazy': ('interface', {'getValue()Ljava/lang/Object;': 'public java.lang.Object getValue();'}, {}),
+    'kotlin.LazyKt': ('class', {}, {}),
+    'kotlin.LazyKt__LazyKt': ('class', {}, {}),
+    'kotlin.LazyKt__LazyJVMKt': ('class', {
+        'lazy(Lkotlin/jvm/functions/Function0;)Lkotlin/Lazy;':
+            'public static kotlin.Lazy lazy(kotlin.jvm.functions.Function0);'}, {}),
+    'kotlin.SynchronizedLazyImpl': ('class', {
+        '<init>(Lkotlin/jvm/functions/Function0;Ljava/lang/Object;)V':
+            'public <init>(kotlin.jvm.functions.Function0,java.lang.Object);',
+        '<init>(Lkotlin/jvm/functions/Function0;Ljava/lang/Object;ILkotlin/jvm/internal/DefaultConstructorMarker;)V':
+            'public <init>(kotlin.jvm.functions.Function0,java.lang.Object,int,kotlin.jvm.internal.DefaultConstructorMarker);',
+        'getValue()Ljava/lang/Object;': 'public java.lang.Object getValue();'}, {}),
+    'kotlin.UNINITIALIZED_VALUE': ('class', {}, {
+        'INSTANCE:Lkotlin/UNINITIALIZED_VALUE;': 'public static final kotlin.UNINITIALIZED_VALUE INSTANCE;'}),
+    'kotlin.jvm.internal.Intrinsics': ('class', {
+        'checkNotNullParameter(Ljava/lang/Object;Ljava/lang/String;)V':
+            'public static void checkNotNullParameter(java.lang.Object,java.lang.String);'}, {}),
+    'kotlin.jvm.internal.DefaultConstructorMarker': ('class', {}, {}),
+}
+
+
+def p11_keep_addition():
+    text = '\n# P11: exact runner initialization ABI; PO6361729695, bytecode evidence P10.\n'
+    for name, (kind, methods, fields) in P11_ROOTS.items():
+        text += '-keep ' + kind + ' ' + name + ' {\n'
+        for member in [*methods.values(), *fields.values()]: text += '    ' + member + '\n'
+        text += '}\n'
+    return text.encode()
+
+
+def p11_rule_policy(raw, baseline):
+    assert raw == baseline + p11_keep_addition(), 'STOP P11: keep differs from exact approved ABI roots'
+    # Exact comparison preserves existing facade/Trace rules while rejecting any new wildcard/waiver.
+    addition = p11_keep_addition().decode()
+    assert not any(token in addition for token in ['*', '...', '-dontwarn', '-dontshrink', '-dontoptimize'])
+
+
+def p11_descriptor(name):
+    return 'L' + name.replace('.', '/') + ';'
+
+
+def p11_program_provider(inputs):
+    assert inputs['status'] == 'OBSERVED' and inputs['stage'] == 'BEFORE_TARGET_R8'
+    assert inputs['mutatesTaskInputs'] is False
+    providers = [r for r in inputs['programClasses'] if r.get('sha256') == P11_STDLIB_SHA]
+    assert len(providers) == 1 and providers[0]['exists'] is True and providers[0]['kind'] == 'file', \
+        'STOP P11: pinned stdlib not uniquely observed as TARGET PROGRAM input'
+    assert not any(r.get('sha256') == P11_STDLIB_SHA for r in inputs['referencedClasses']), \
+        'STOP P11: conflicting program/library role'
+    return providers[0]
+
+
+def p11_lookup(definitions, owner, member, field=False):
+    queue, visited = [owner], set()
+    while queue:
+        name = queue.pop(0)
+        if name in visited or name not in definitions: continue
+        visited.add(name); info = definitions[name]
+        members = info['fields' if field else 'methods']
+        if member in members: return name, members[member]
+        if member.startswith('<init>('): continue  # Constructors are never inherited.
+        if info['superclass']: queue.append(info['superclass'])
+        queue.extend(info['interfaces'])
+    return None
+
+
+def p11_validate_facts(target, test, selected, errors, canary_removed):
+    failures, rows = [], []
+    if errors: failures.append('DEX_DECODE_ERRORS')
+    if not canary_removed: failures.append('CANARY_NOT_REMOVED')
+    for name, (kind, methods, fields) in P11_ROOTS.items():
+        owner = p11_descriptor(name); expected = selected[owner]; actual = target.get(owner)
+        if owner in test: failures.append('TEST_DUPLICATE:' + owner)
+        if not actual:
+            failures.append('TARGET_CLASS_MISSING:' + owner); continue
+        if bool(actual['flags'] & 0x200) != (kind == 'interface'):
+            failures.append('CLASS_KIND:' + owner)
+        if actual['superclass'] != expected['superclass'] or actual['interfaces'] != expected['interfaces']:
+            failures.append('HIERARCHY:' + owner)
+        member_rows = []
+        for field, signatures in [(False, methods), (True, fields)]:
+            category = 'fields' if field else 'methods'
+            declared = {m['name'] + (':' if field else '') + m['descriptor']: m for m in expected[category]}
+            for signature in signatures:
+                assert signature in declared, 'P11 root absent from selected classfile: ' + owner + signature
+                got = p11_lookup(target, owner, signature, field)
+                valid = got is not None and got[0] == owner
+                if valid:
+                    flags = got[1] if field else got[1]['flags']
+                    valid = flags & 0x40f == declared[signature]['flags'] & 0x40f
+                if not valid: failures.append('MEMBER_ABI:' + owner + '->' + signature)
+                member_rows.append(dict(member=signature, valid=valid, declaringOwner=got[0] if got else None))
+        rows.append(dict(owner=owner, members=member_rows))
+    lazy = p11_lookup(target, 'Lkotlin/LazyKt;', 'lazy(Lkotlin/jvm/functions/Function0;)Lkotlin/Lazy;')
+    if not lazy or lazy[0] != 'Lkotlin/LazyKt__LazyJVMKt;': failures.append('INHERITED_LAZY_ABI')
+    return failures, rows
+
+
+def p11_negative_controls(selected):
+    # Synthetic facts only: do not edit APKs, source, JARs, inputs or acceptance.
+    clone = lambda x: json.loads(json.dumps(x))
+    target = {owner: dict(flags=body['flags'], superclass=body['superclass'], interfaces=body['interfaces'],
+        methods={m['name'] + m['descriptor']: dict(flags=m['flags']) for m in body['methods']},
+        fields={m['name'] + ':' + m['descriptor']: m['flags'] for m in body['fields']}) for owner, body in selected.items()}
+    assert not p11_validate_facts(target, {}, selected, [], True)[0]
+    rows = []
+    for case in ['missing-class', 'renamed-member', 'static-drift', 'broken-hierarchy', 'test-duplicate',
+                 'canary-present', 'decode-error']:
+        t, test, errors, canary = clone(target), {}, [], True
+        if case == 'missing-class': del t['Lkotlin/jvm/internal/Lambda;']
+        elif case == 'renamed-member': del t['Lkotlin/jvm/internal/Lambda;']['methods']['getArity()I']
+        elif case == 'static-drift':
+            t['Lkotlin/LazyKt__LazyJVMKt;']['methods']['lazy(Lkotlin/jvm/functions/Function0;)Lkotlin/Lazy;']['flags'] ^= 8
+        elif case == 'broken-hierarchy': t['Lkotlin/LazyKt;']['superclass'] = 'Ljava/lang/Object;'
+        elif case == 'test-duplicate': test['Lkotlin/Function;'] = t['Lkotlin/Function;']
+        elif case == 'canary-present': canary = False
+        else: errors = ['synthetic decode failure']
+        assert p11_validate_facts(t, test, selected, errors, canary)[0], case
+        rows.append(dict(case=case, result='REJECTED'))
+    baseline = b'# synthetic baseline\n'; valid = baseline + p11_keep_addition()
+    for case, raw in [('blanket', valid + b'-keep class kotlin.** { *; }\n'),
+                      ('dontwarn', valid + b'-dontwarn **\n'),
+                      ('member-removed', valid.replace(b'public int getArity();', b'', 1))]:
+        try: p11_rule_policy(raw, baseline)
+        except AssertionError: rows.append(dict(case=case, result='REJECTED'))
+        else: raise AssertionError('P11 control accepted ' + case)
+    good_input = dict(status='OBSERVED', stage='BEFORE_TARGET_R8', mutatesTaskInputs=False,
+                      programClasses=[dict(sha256=P11_STDLIB_SHA, exists=True, kind='file')], referencedClasses=[])
+    p11_program_provider(good_input)
+    for case in ['library-only', 'input-hash-drift', 'mutating-observer', 'duplicate-program-provider']:
+        inputs = clone(good_input)
+        if case == 'library-only': inputs['referencedClasses'] = inputs.pop('programClasses'); inputs['programClasses'] = []
+        elif case == 'input-hash-drift': inputs['programClasses'][0]['sha256'] = '0' * 64
+        elif case == 'mutating-observer': inputs['mutatesTaskInputs'] = True
+        else: inputs['programClasses'] *= 2
+        try: p11_program_provider(inputs)
+        except AssertionError: rows.append(dict(case=case, result='REJECTED'))
+        else: raise AssertionError('P11 input control accepted ' + case)
+    return rows
+
+
+def p11_verify():
+    """Fail-closed, bounded ABI oracle. No waiver of any existing runtime/security gate."""
+    report = dict(authority='Issue16 comment6361729695', status='NOT-VERIFIED', failures=[],
+                  source=json.loads((REPORT / 'source.json').read_text()), fullRuntimeClosureClaim=False)
+    try:
+        baseline = subprocess.check_output(['git', 'show', P11_BASE_HEAD + ':security/b2-g2/proguard-rules.pro'], cwd=ROOT)
+        keep = (HARNESS / 'proguard-rules.pro').read_bytes(); p11_rule_policy(keep, baseline)
+        report['keepSha256'] = sha(keep)
+        input_path = REPORT / 'p11-target-r8-inputs.json'; inputs = json.loads(input_path.read_text())
+        provider = p11_program_provider(inputs)
+        jar = pathlib.Path(provider['path']); assert sha(jar.read_bytes()) == P11_STDLIB_SHA
+        selected = {}
+        with zipfile.ZipFile(jar) as archive:
+            for name in P11_ROOTS:
+                body = p10_classfile(archive.read(name.replace('.', '/') + '.class'))
+                assert body['owner'] == p11_descriptor(name)
+                selected[body['owner']] = body
+        report.update(targetProgramInput=provider, selectedClassfileABI=selected,
+                      targetR8Inputs=dict(path=str(input_path.relative_to(ROOT)), sha256=sha(input_path.read_bytes())),
+                      negativeControls=p11_negative_controls(selected))
+        java_home = pathlib.Path(os.environ.get('JAVA_HOME', '/nonexistent'))
+        javap = str(java_home / 'bin/javap') if (java_home / 'bin/javap').exists() else 'javap'
+        p07_command('p11-selected-abi-javap', [javap, '-p', '-s', '-c', '-classpath', str(jar), *P11_ROOTS], timeout=30)
+        disassembly = json.loads((REPORT / 'p07/commands.json').read_text())[-1]
+        report['selectedDisassembly'] = disassembly
+        assert disassembly['exit'] == 0, 'STOP P11: selected ABI disassembly unavailable'
+        documents, apks = {}, {}
+        for kind, directory in [('target', 'release'), ('test', 'androidTest/release')]:
+            paths = list((HARNESS / 'build/outputs/apk' / directory).glob('*.apk')); assert len(paths) == 1
+            path = paths[0]; apks[kind] = dict(path=str(path.relative_to(ROOT)), sha256=sha(path.read_bytes()))
+            documents[kind] = []
+            with zipfile.ZipFile(path) as archive:
+                for entry in archive.namelist():
+                    if re.fullmatch(r'classes\d*\.dex', entry):
+                        documents[kind].append(p10_dex(archive.read(entry), dict(apk=kind, entry=entry, **apks[kind])))
+        definitions, errors = {}, []
+        for kind, docs in documents.items():
+            definitions[kind] = {}
+            for d in docs:
+                errors.extend(d['decodeErrors'])
+                assert not (set(definitions[kind]) & set(d['definitions'])), 'Duplicate class across DEX entries'
+                definitions[kind].update(d['definitions'])
+        trace = json.loads((REPORT / 'p08-trace-apks.json').read_text())
+        failures, rows = p11_validate_facts(definitions['target'], definitions['test'], selected, errors,
+                                           trace['facts']['canaryRemoved'])
+        test_input_path = REPORT / 'p06-r8-inputs.json'; test_inputs = json.loads(test_input_path.read_text())
+        assert test_inputs['status'] == 'OBSERVED' and test_inputs['mutatesTaskInputs'] is False
+        root_entries = {name.replace('.', '/') + '.class' for name in P11_ROOTS}
+        test_program_roots = []
+        for item in test_inputs['programClasses']:
+            path = pathlib.Path(item['path']); found = []
+            if path.is_dir(): found = [entry for entry in root_entries if (path / entry).exists()]
+            elif path.is_file() and path.suffix == '.jar':
+                assert sha(path.read_bytes()) == item['sha256'], 'P11 test program input hash drift'
+                with zipfile.ZipFile(path) as archive: found = sorted(root_entries & set(archive.namelist()))
+            if found: test_program_roots.append(dict(input=item, entries=found))
+        if test_program_roots: failures.append('SHARED_ROOT_IN_TEST_PROGRAM_INPUT')
+        # Only the explicitly kept ABI is mandatory here. Other conditional references are reported,
+        # never auto-kept and never misreported as globally resolved cross-APK linkage.
+        linkage, deferred = [], []
+        root_types = set(selected)
+        for doc in documents['test']:
+            for ref in doc['references']:
+                if ref['type'] not in root_types or ref['kind'].endswith('_SIGNATURE'): continue
+                if not ref['kind'].startswith(('INVOKE_', 'FIELD_ACCESS_')): continue
+                field = ref['kind'].startswith('FIELD_ACCESS_')
+                contract = P11_ROOTS[ref['type'][1:-1].replace('/', '.')][2 if field else 1]
+                inherited_lazy = ref['type'] == 'Lkotlin/LazyKt;' and ref['referencedMember'] == 'lazy(Lkotlin/jvm/functions/Function0;)Lkotlin/Lazy;'
+                got = p11_lookup(definitions['target'], ref['type'], ref['referencedMember'], field)
+                row = dict(**ref, targetDeclaringOwner=got[0] if got else None)
+                if ref['referencedMember'] in contract or inherited_lazy:
+                    linkage.append(row)
+                    if not got: failures.append('ROOT_CROSS_APK_LINKAGE:' + ref['type'] + ref['referencedMember'])
+                else: deferred.append(row)
+        assert linkage, 'STOP P11: no actual test cross-APK ABI use sites'
+        collisions = sorted(set(definitions['target']) & set(definitions['test']))
+        if collisions: failures.append('CROSS_APK_CLASS_COLLISIONS')
+        mapping_path = HARNESS / 'build/outputs/mapping/release/mapping.txt'; mapping = mapping_path.read_text()
+        for name in P11_ROOTS:
+            if not re.search(r'^' + re.escape(name) + r' -> ' + re.escape(name) + r':$', mapping, re.M):
+                failures.append('ROOT_MAPPING_NAME:' + name)
+        report.update(failures=failures, rootDefinitions=rows, rootCrossApkLinkage=linkage,
+                      deferredConditionalReferences=deferred, collisions=collisions, apks=apks,
+                      testProgramRootLeaks=test_program_roots,
+                      testR8Inputs=dict(path=str(test_input_path.relative_to(ROOT)), sha256=sha(test_input_path.read_bytes())),
+                      mapping=dict(path=str(mapping_path.relative_to(ROOT)), sha256=sha(mapping_path.read_bytes())),
+                      canaryRemoved=trace['facts']['canaryRemoved'], decodeErrors=errors,
+                      note='Bounded selected runner ABI only; runtime 5 tests/20 metrics and all old gates remain mandatory.')
+        report['status'] = 'PASS' if not failures else 'FAIL'
+    except Exception as error:
+        report['status'] = 'FAIL'; report['failures'].append(type(error).__name__ + ': ' + str(error))
+    write_json('p11-abi-oracle.json', report)
+    assert report['status'] == 'PASS', 'STOP P11 ABI oracle: ' + str(report['failures'])
+
+
 def inspect():
+    p11 = json.loads((REPORT / 'p11-abi-oracle.json').read_text())
+    assert p11['status'] == 'PASS' and p11['source'] == json.loads((REPORT / 'source.json').read_text())
+    assert p11['keepSha256'] == sha((HARNESS / 'proguard-rules.pro').read_bytes())
+    assert all(sha((ROOT / row['path']).read_bytes()) == row['sha256'] for row in p11['apks'].values())
     verify_toolchain()
     verify_catalog((HARNESS / 'gradle/libs.versions.toml').read_bytes())
     verify_test_resolution()

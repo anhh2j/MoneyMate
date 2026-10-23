@@ -484,3 +484,73 @@ không dùng test R8 library input thay bằng chứng đó. Nếu không thể 
 Sau khi đối chiếu classfile/member và program role mới được áp dụng exact ABI roots;
 keep không thể chuyển library class thành program. Không tự chữa crash mới; mọi sửa
 build/dependency hoặc mở rộng allowlist cần quyết định PO riêng. PR17/18 vẫn Draft.
+
+### G2-P11 — thử nghiệm exact ABI roots (Phương án B)
+
+Bước trước keep tại HEAD c61158b6e468d7f9dbd0b5262be1eea78769bcf3,
+run39931996535, artifact API35 ID12492720897 (ZIP SHA256
+b0440ec15948e75055d033eb355a53f838af596bdc0255824a7314fa50831455)
+đã xác minh `BEFORE_TARGET_R8`, `mutatesTaskInputs=false`, selected stdlib2.4.21 thuộc
+target **programClasses**, không thuộc referencedClasses. Input snapshot SHA256
+a6a2e6823957324a62045acf573cf1b029e97eea540587e8f5dd708bfd366bb0.
+JAR SHA256 bd8250210584cb659847dce9cda660f8e9906e5def7fbebcea93dc6dcb6a88a3
+khớp P10 và QA6361646601. Trước khi sửa keep đã đọc classfile tất cả12 root classes
+và exact signatures; không suy program role từ test library input.
+
+P11 giữ nguyên từng byte keep cũ tại55f2da1 (B2KdfProbe và3 Trace API), chỉ append
+exact rules từ `P11_ROOTS` trong inspector. Bảng này mô tả toàn bộ keep mới:
+
+| Class identity | Exact members được giữ | Evidence |
+|---|---|---|
+| kotlin.jvm.internal.Lambda | public ctor(int), getArity():int | crash P10; TestDirCalculator inputDir$2/outputDir$2 ctor invoke PC3; classfile ctor/arity |
+| kotlin.jvm.internal.FunctionBase | getArity():int | Lambda implements FunctionBase; classfile |
+| kotlin.Function | không member | FunctionBase/Function0 extends Function |
+| kotlin.jvm.functions.Function0 | invoke():Object | TestDirCalculator lazy argument/callback ABI; selected SynchronizedLazyImpl.getValue bytecode |
+| kotlin.Lazy | getValue():Object | TestDirCalculator.getInputDir/getOutputDir actual invoke |
+| kotlin.LazyKt | không member | actual invoke owner lazy(Function0):Lazy |
+| kotlin.LazyKt__LazyKt | không member | classfile LazyKt superclass, bắc cầu tới declaring class |
+| kotlin.LazyKt__LazyJVMKt | public static lazy(Function0):Lazy | inherited lookup và javap default overload |
+| kotlin.SynchronizedLazyImpl | public ctor(Function0,Object), ctor(Function0,Object,int,DefaultConstructorMarker), getValue():Object | default lazy bytecode + constructor chain + Lazy.getValue dispatch |
+| kotlin.UNINITIALIZED_VALUE | public static final INSTANCE:UNINITIALIZED_VALUE | constructor/getValue field access; initializer/ctor phụ thuộc do R8 giữ transitively |
+| kotlin.jvm.internal.Intrinsics | public static checkNotNullParameter(Object,String):void | selected default lazy và SynchronizedLazyImpl constructor bytecode |
+| kotlin.jvm.internal.DefaultConstructorMarker | không member | synthetic ctor descriptor; không giả định private ctor được gọi |
+
+Class identity rules dùng `{}` explicit để không vô tình giữ default constructor.
+Không wildcard member/namespace/overload; không keep isInitialized/toString/writeReplace,
+overload lazy(mode,...)/lazy(lock,...), SafePublication/UnsafeLazyImpl hay coroutine roots.
+Exact ABI roots giữ tên và chữ ký ở ranh giới hai APK; các member không liệt kê vẫn có
+thể shrink/rename/optimize, implementation cần từ roots được R8 phân tích transitively.
+Không tắt optimization/shrink toàn cục, không thêm dependency/program input.
+Tham chiếu cách hiểu keep/member modifiers:
+https://developer.android.com/topic/performance/app-optimization/add-keep-rules
+
+Oracle fail-closed `p11-abi-oracle.json` là gate mới bổ sung sau build/scans/P10 diagnostics,
+trước instrumentation. Nó không nằm trong safe diagnostic wrapper. Kiểm:
+- Source keep đúng baseline+exact12 roots, chặn mọi thay đổi/wildcard/dontwarn ngoài hợp đồng.
+- Snapshot target program role/hash; selected classfile declarations/kind/hierarchy và member
+  visibility/static/abstract ABI. Thu `javap -p -s -c` cả12 classes trong CI P07 manifest,
+  không còn chỉ dựa local supplement P10.
+- Actual class_defs/class_data của mọi DEX target/test; decode errors là FAIL;12 original
+  class identities/hierarchy và exact member owners/flags phải còn ở target, identity
+  mapping phải không đổi. LazyKt.lazy phải resolve qua hierarchy tới LazyKt__LazyJVMKt.
+- Actual test invoke/field sites trên ABI roots phải resolve đúng final target members;
+  roots không có trong test program input/DEX; collision0; canary vẫn bị loại.
+- Inspector cuối đối chiếu lại source/keep/APK hashes với oracle; không chấp nhận report
+  cũ hoặc APK bị thay. Mọi5 tests/20 metrics/JNI/KAT/ABI/page/memory/signing/security gate
+  cũ giữ nguyên, oracle PASS không thay runtime acceptance.
+
+14 negative controls thuần dữ liệu: missing class, member bị đổi tên/mất, static drift,
+broken hierarchy, duplicate test class, canary retained, decode error, blanket rule,
+dontwarn, member rule removed, library-only provider, hash drift, mutating observer,
+duplicate program provider. Không mutate APK/build/source/input trong controls.
+
+Giới hạn: oracle chỉ xác minh bounded ABI theo bảng, không complete shared-runtime
+closure. Ví dụ Intrinsics.areEqual từ đường conditional khác không tự thành keep;
+tham chiếu ngoài exact member contract được ghi `deferredConditionalReferences` với
+vị trí thực và trạng thái resolve, không tuyên bố mọi reference đều đã đóng. Classloader,
+virtual dispatch/reflection và tất cả paths chỉ được xác nhận bằng runtime thực.
+Nếu có class/member crash mới, class không vào target DEX, cần đổi dependency/build,
+checksum/toolchain hoặc ngoài3 path: giữ raw evidence và STOP, không nối keep theo crash.
+Rerun4 cell30m/cell và CI nền cùng HEAD, artifact3 ngày; không bỏ gate API26 clear-logcat
+hay biến G2 FAIL thành PASS. Permission/apksigner/aapt/license/legal vẫn OPEN ngoài P11.
+QA độc lập trước Leader review; PR17/18 Draft, không Ready/merge/tag/release/production.
