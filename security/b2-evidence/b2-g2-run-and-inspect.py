@@ -344,6 +344,20 @@ def readInputFiles = { task, String getter ->
     value.collect { File file -> describe(file) }
 }
 gradle.taskGraph.beforeTask { task ->
+    // P11: read target input roles before proposing any keep change; never mutate inputs.
+    if (task.project.rootProject.name == 'MoneyMate-B2-G2-Test-Only' && task.path == ':minifyReleaseWithR8') {
+        def output = new File(task.project.rootProject.projectDir, 'build/reports/b2-g2')
+        output.mkdirs()
+        def evidence = [task: task.path, taskType: task.class.name, stage: 'BEFORE_TARGET_R8',
+                        status: 'NOT-VERIFIED', mutatesTaskInputs: false]
+        try {
+            evidence.programClasses = readInputFiles(task, 'getProgramClasses')
+            evidence.referencedClasses = readInputFiles(task, 'getReferencedClasses')
+            evidence.bootClasspath = readInputFiles(task, 'getBootClasspath')
+            evidence.status = 'OBSERVED'
+        } catch (Exception failure) { evidence.observationError = failure.toString() }
+        new File(output, 'p11-target-r8-inputs.json').text = JsonOutput.toJson(evidence)
+    }
     if (task.project.rootProject.name != 'MoneyMate-B2-G2-Test-Only' || task.path != ':minifyReleaseAndroidTestWithR8') return
     def output = new File(task.project.rootProject.projectDir, 'build/reports/b2-g2')
     output.mkdirs()

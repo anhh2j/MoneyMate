@@ -472,3 +472,15 @@ report,30 phút/cell, retention3 ngày và CI nền cùng HEAD; G2 FAIL được
 API26 logcat, permission, apksigner/aapt, license collector/legal vẫn ngoài P10. QA độc lập
 trước Leader review; PR17/18 Draft, không Ready/merge/tag/release/T20 production;
 ARM64 thực/ARM64-16KiB thực/native OOM OPEN.
+
+### G2-P11 — bước đối chiếu program input trước keep
+
+PO6361729695 phê duyệt thử nghiệm Phương án B theo Leader6361701203 trong3 path:
+proguard-rules.pro, inspector và protocol; mọi bất biến P10/796 records/12 paths giữ nguyên.
+Trước khi sửa keep, observer read-only thu `p11-target-r8-inputs.json` ngay trước
+`:minifyReleaseWithR8`, gồm program/referenced/boot inputs và SHA256. Bước này chưa đổi
+keep hoặc dependency: phải chứng minh selected stdlib2.4.21 là target PROGRAM input,
+không dùng test R8 library input thay bằng chứng đó. Nếu không thể xác minh, STOP.
+Sau khi đối chiếu classfile/member và program role mới được áp dụng exact ABI roots;
+keep không thể chuyển library class thành program. Không tự chữa crash mới; mọi sửa
+build/dependency hoặc mở rộng allowlist cần quyết định PO riêng. PR17/18 vẫn Draft.
