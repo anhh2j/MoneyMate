@@ -2,7 +2,7 @@
 
 Authority: Issue16 Leader6354170980 / PO6354549594, based on preflight6345775478.
 Base main690a74af29897d43fcb9f4c58808ae6ea2e3365f. PR17 remains Draft and unchanged.
-Only the eleven new paths approved by PO are used; the inspector enforces exact additions.
+Only the twelve paths approved through PO G2-P04 are used; the inspector enforces exact additions.
 
 This separate Gradle application root is not included in MoneyMate settings/graph.
 Argon2Kt1.6.0 is implementation only in this disposable test target. The production
@@ -59,7 +59,7 @@ PSS/native/Java readings are before/after snapshots, not per-call peak allocatio
 Bounded memory success does not prove native allocation failure or exhausted-memory
 behavior. ARM64 runtime, real ARM64 16KiB and native OOM remain OPEN/ENV-BLOCKED.
 
-Capture source/head/tree, eleven-path SHA manifest, commands/exit codes, SDK catalogue,
+Capture source/head/tree, twelve-path SHA manifest, commands/exit codes, SDK catalogue,
 actual API/ABI/kernel/page-size/memory, JUnit5/0/0/0, metrics20, target/test APK hashes,
 signatures, mapping/DEX/ELF/ZIP evidence, inventory/security reports and failure logs.
 Actual results are submitted in Vietnamese on Issue16; no fabricated or pending PASS.
@@ -138,3 +138,31 @@ existing allowlist; the unreachable class must still disappear in target R8 outp
 | `org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4` | [kotlinx-coroutines-core-jvm-1.6.4.jar](https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.6.4/kotlinx-coroutines-core-jvm-1.6.4.jar) | `c24c8bb27bb320c4a93871501a7e5e0c61607638907b197aef675513d4c820be` |
 | `org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4` | [kotlinx-coroutines-core-jvm-1.6.4.module](https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.6.4/kotlinx-coroutines-core-jvm-1.6.4.module) | `0d94c8a41483e7c2707ebd693e1b1357a84152998ce85550ebbc54ca4321a3a7` |
 | `androidx.tracing:tracing:1.0.0` | [tracing-1.0.0.aar](https://dl.google.com/dl/android/maven2/androidx/tracing/tracing/1.0.0/tracing-1.0.0.aar) | `07b8b6139665b884a162eccf97891ca50f7f56831233bf25168ae04f7b568612` |
+
+## G2-P04 Android Lint remediation and twelfth path
+
+Authority: PO Issue16 comment6356956055 (23/10/2026), accepting Leader6356470178
+and QA6356875416. KGP is requested through the existing pinned kotlin-jvm alias with
+apply false; the JVM plugin is not applied. AGP9.4.1/compiler/KGP/BTA2.4.21 parity
+must still be observed, not inferred. Release resource shrinking is enabled alongside
+R8. No keep rule, KAT, task, catalog, checksum, production or original CI change.
+
+The manifest references framework drawable ic_menu_info_details and the only new path:
+security/b2-g2/src/main/res/xml/data_extraction_rules.xml. Cloud backup and device
+transfer exclude root/file/database/sharedpref/external and all four device-protected
+domains at path dot. allowBackup=false is preserved, with no permission added.
+Android Lint and actual merged/packaged resources must validate this test-only config.
+The source guard accepts exactly twelve added paths and rejects missing/modified or
+thirteenth paths. The existing upload globs already capture generated evidence, so
+no workflow edit is needed. Metadata stays byte-exact795=784+10+1.
+
+License evidence is collected for every component of both resolved inventories from
+cached or upstream Maven/Google POM declarations, including bounded parent traversal.
+Each read records coordinate/source/SHA256. These are read-only license declarations,
+not new Gradle dependency admissions or verification checksum additions. An enriched
+SBOM copy preserves every component, marks unresolved declarations UNKNOWN, and is
+scanned with the already pinned Trivy license scanner. The original inventory and
+HIGH/CRITICAL vulnerability gates are unchanged. License provenance/classification
+is evidence for independent QA, not a legal PASS; missing declarations remain explicitly
+NOT-VERIFIED, never silently omitted. Scanner execution errors still fail the command.
+No ignored-license list or policy exemption is introduced.

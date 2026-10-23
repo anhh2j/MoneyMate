@@ -4,19 +4,10 @@ import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.artifacts.result.UnresolvedDependencyResult
 import java.security.MessageDigest
 
-// G2-P02 option B: match the observed MoneyMate compiler toolchain, not AGP's default.
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.21")
-    }
-}
-
 plugins {
     alias(libs.plugins.android.application)
+    // Request the baseline KGP without applying a JVM plugin to this Android harness.
+    alias(libs.plugins.kotlin.jvm) apply false
 }
 
 android {
@@ -32,6 +23,7 @@ android {
     buildTypes {
         getByName("release") {
             isMinifyEnabled = true
+            isShrinkResources = true
             isDebuggable = false
             signingConfig = signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

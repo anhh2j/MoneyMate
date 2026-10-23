@@ -1,5 +1,6 @@
 """B2-G2 isolated execution, fail-closed evidence inspection; synthetic inputs only."""
 import argparse
+import concurrent.futures
 import hashlib
 import json
 import os
@@ -8,6 +9,7 @@ import re
 import shutil
 import struct
 import subprocess
+import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
 
@@ -49,6 +51,7 @@ PATHS = [
     'security/b2-g2/gradle/verification-metadata.xml',
     'security/b2-g2/proguard-rules.pro',
     'security/b2-g2/src/main/AndroidManifest.xml',
+    'security/b2-g2/src/main/res/xml/data_extraction_rules.xml',
     'security/b2-g2/src/main/kotlin/com/app/moneymate/b2g2/B2KdfProbe.kt',
     'security/b2-g2/src/androidTest/kotlin/com/app/moneymate/b2g2/B2G2RuntimeTest.kt',
     '.github/workflows/t20-b2-g2-compat.yml',
@@ -115,10 +118,41 @@ def gradle(label, *tasks):
                            '--console=plain', *tasks])
 
 
+def verify_scope(changes):
+    assert len(PATHS) == 12 and len(set(PATHS)) == 12, 'STOP: expected exact P04 twelve-path allowlist'
+    assert sorted(changes) == sorted('A\t' + p for p in PATHS), changes
+
+
+def guard_negative_controls(metadata):
+    rows = ['A\t' + path for path in PATHS]
+    verify_scope(rows)
+    checks = [
+        ('missing-path', verify_scope, rows[:-1]),
+        ('thirteenth-path', verify_scope, rows + ['A\tsynthetic-unapproved.txt']),
+        ('modified-baseline-path', verify_scope, ['M\t' + PATHS[0]] + rows[1:]),
+        ('metadata-byte-change', verify_metadata, metadata + b' '),
+        ('verification-config-change', verify_metadata,
+         metadata.replace(b'<verify-metadata>true</verify-metadata>', b'<verify-metadata>false</verify-metadata>')),
+        ('p03-hash-change', verify_metadata, metadata.replace(APPROVED_CHECKSUMS[-1][2].encode(), b'0' * 64)),
+        ('p01-hash-change', verify_metadata, metadata.replace(APPROVED_CHECKSUMS[0][2].encode(), b'0' * 64)),
+        ('unapproved-component', verify_metadata,
+         metadata.replace(b'   </components>', b'      <component group="synthetic" name="unapproved" version="1"/>\n   </components>')),
+    ]
+    results = []
+    for name, guard, value in checks:
+        try:
+            guard(value)
+        except AssertionError:
+            results.append({'case': name, 'result': 'REJECTED'})
+        else:
+            raise AssertionError('Guard accepted negative control: ' + name)
+    write_json('p04-negative-controls.json', {'status': 'PASS', 'controls': results, 'sourceFilesMutated': False})
+
+
 def preflight():
     REPORT.mkdir(parents=True, exist_ok=True)
     changes = subprocess.check_output(['git', 'diff', '--name-status', BASE, 'HEAD'], cwd=ROOT, text=True).splitlines()
-    assert sorted(changes) == sorted('A\t' + p for p in PATHS), changes
+    verify_scope(changes)
     write_json('changed-files.json', [{'path': p, 'sha256': sha((ROOT / p).read_bytes())} for p in PATHS])
     identity = subprocess.check_output(['git', 'rev-parse', 'HEAD', 'HEAD^{tree}'], cwd=ROOT, text=True).splitlines()
     write_json('source.json', {'base': BASE, 'head': identity[0], 'tree': identity[1], 'acceptedB2': ACCEPTED_B2})
@@ -126,6 +160,7 @@ def preflight():
     assert (HARNESS / 'gradle/libs.versions.toml').read_bytes() == reference, 'Catalog must remain byte-exact'
     metadata = (HARNESS / 'gradle/verification-metadata.xml').read_bytes()
     verify_metadata(metadata)
+    guard_negative_controls(metadata)
     write_json('checksum-policy.json', {'baselineArtifactRecords': 784, 'approvedAdditions': APPROVED_CHECKSUMS,
                                        'p01Additions': 10, 'p03Additions': 1, 'totalArtifactRecords': 795,
                                        'metadataSha256': sha(metadata), 'strictVerification': True})
@@ -169,6 +204,83 @@ def build():
         command(name + '-scan', [str(tools / 'trivy'), 'sbom', '--severity', 'HIGH,CRITICAL', '--exit-code', '1',
                                  '--format', 'json', '--output', str(REPORT / (name + '-vulnerabilities.json')),
                                  str(inventory)])
+        license_inventory(inventory, tools)
+
+
+def license_inventory(inventory, tools):
+    """Collect declared POM licenses with provenance; retain UNKNOWN for independent QA."""
+    document = json.loads(inventory.read_text())
+    cache = pathlib.Path(os.environ.get('GRADLE_USER_HOME', pathlib.Path.home() / '.gradle')) / 'caches/modules-2/files-2.1'
+    ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+
+    def collect(component):
+        coordinate = tuple(component[key] for key in ['group', 'name', 'version'])
+        provenance, seen = [], set()
+        licenses, error = [], None
+        for _ in range(6):
+            if coordinate in seen or not all(coordinate):
+                break
+            seen.add(coordinate)
+            group, name, version = coordinate
+            filename = f'{name}-{version}.pom'
+            local = list((cache / group / name / version).glob('*/' + filename))
+            if local:
+                raw, source = local[0].read_bytes(), 'gradle-cache:' + ':'.join(coordinate) + '/' + filename
+            else:
+                relative = '/'.join([group.replace('.', '/'), name, version, filename])
+                repositories = ['https://repo.maven.apache.org/maven2/', 'https://dl.google.com/dl/android/maven2/']
+                if group.startswith(('androidx.', 'com.android')):
+                    repositories.reverse()
+                raw = None
+                for repository in repositories:
+                    try:
+                        source = repository + relative
+                        with urllib.request.urlopen(source, timeout=8) as response:
+                            raw = response.read(2 * 1024 * 1024)
+                        break
+                    except Exception as failure:
+                        error = type(failure).__name__
+                if raw is None:
+                    break
+            provenance.append({'coordinate': ':'.join(coordinate), 'source': source, 'sha256': sha(raw)})
+            try:
+                root = ET.fromstring(raw)
+                licenses = [dict(name=entry.findtext('m:name', default='', namespaces=ns),
+                                 url=entry.findtext('m:url', default='', namespaces=ns))
+                            for entry in root.findall('m:licenses/m:license', ns)]
+                licenses = [entry for entry in licenses if entry['name'] or entry['url']]
+                if licenses:
+                    break
+                parent = root.find('m:parent', ns)
+                if parent is None:
+                    break
+                coordinate = tuple(parent.findtext('m:' + key, namespaces=ns) for key in ['groupId', 'artifactId', 'version'])
+                if any(value and '${' in value for value in coordinate):
+                    break
+            except ET.ParseError as failure:
+                error = type(failure).__name__
+                break
+        return {'component': component['purl'], 'licenses': licenses, 'provenance': provenance,
+                'status': 'DECLARED' if licenses else 'NOT-VERIFIED', 'fetchError': error if not licenses else None}
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        rows = list(executor.map(collect, document['components']))
+    by_purl = {row['component']: row for row in rows}
+    for component in document['components']:
+        declarations = by_purl[component['purl']]['licenses']
+        component['licenses'] = [{'license': entry} for entry in declarations] or [{'license': {'name': 'UNKNOWN'}}]
+    stem = inventory.name.removesuffix('.json')
+    enriched = REPORT / (stem + '-licenses.cdx.json')
+    enriched.write_text(json.dumps(document, indent=2) + '\n')
+    write_json(stem + '-license-provenance.json', {
+        'inventorySha256': sha(inventory.read_bytes()), 'enrichedSha256': sha(enriched.read_bytes()),
+        'components': rows, 'declared': sum(row['status'] == 'DECLARED' for row in rows),
+        'unverified': sum(row['status'] == 'NOT-VERIFIED' for row in rows),
+        'assessment': 'DECLARATIONS_AND_SCANNER_CLASSIFICATION_ONLY_REQUIRES_QA_REVIEW',
+    })
+    # Preserve every classification; no license exception, ignore list or legal PASS is inferred.
+    command(stem + '-license-scan', [str(tools / 'trivy'), 'sbom', '--scanners', 'license', '--format', 'json',
+                                   '--output', str(REPORT / (stem + '-licenses.json')), str(enriched)])
 
 
 def verify_toolchain():
