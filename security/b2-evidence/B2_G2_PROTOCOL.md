@@ -349,3 +349,44 @@ License UNKNOWN/HIGH giữ nguyên. Nếu tracing qua nhưng gặp lỗi khác, 
 đã chứng minh và blocker còn lại; không nghiệm thu G2 khi chưa đủ gates. QA độc lập,
 PR17/18 Draft, không Ready/merge/tag/release/T20 production; ARM64 thực/ARM64-16KiB thực/
 native OOM vẫn OPEN.
+
+## G2-P09 — ngoại lệ duy nhất annotation1.2.0 metadata
+
+Thẩm quyền: PO6360301889, Leader6360285956, QA6360259200 (23/10/2026).
+Chỉ verification-metadata.xml, inspector và protocol được sửa. P09 thay giới hạn795
+trước đó bằng **796 =784 baseline +10 P01 +1 P03 +1 P09**; không mở ngoại lệ khác.
+Mọi record/cấu hình strict trước đó giữ nguyên từng byte. Catalog P05/P08, dependency/
+version/constraint, P08 keep rule/runner/task wiring, KAT/test, AGP9.4.1/Kotlin2.4.21,
+manifest/permission/workflow/root/production/QA/release/version không đổi; vẫn12 path.
+
+Record duy nhất được thêm: androidx.annotation:annotation:1.2.0 /
+annotation-1.2.0.module, SHA256
+2efcab81ef91b211bacd206eaacd995a51f633a2e96b57a8fc00144c5f9c56b3.
+Nguồn Google Maven:
+https://dl.google.com/dl/android/maven2/androidx/annotation/annotation/1.2.0/annotation-1.2.0.module
+2709 byte; SHA1 26f06565ebe0e525e1a183b59a9ad2e2eb799b2a khớp cache path
+trong P08 strict verification HTML. QA đã đối chiếu độc lập upstream. Tracing1.1.0.module
+runtime variant yêu cầu annotation1.2.0; việc cần đọc metadata không tự chứng minh final
+selected annotation version. Không thêm pin JAR/POM/variant hay chạy write-verification-metadata.
+
+Guard dựng baseline và11 additions P01/P03 như cũ thành795 bytes, rồi chèn exact một
+P09 block. Bỏ block mới phải phục hồi toàn bộ795 bytes trước, không reformat XML.
+Positive control chấp nhận đúng796; giữ8 controls cũ và thêm6 controls chặn mất P09,
+đổi hash/artifact/coordinate, duplicate block hoặc thêm hash. Báo cáo legacy
+p04-negative-controls.json chứa14 controls và authority/positiveMetadata P09;
+checksum-policy.json ghi796, p09Additions=1 và đủ12 additions. Catalog/R8/graph/JUnit/
+metrics/security/license guard giữ nguyên; các negative controls khác không đổi.
+
+Tái lập workflow G2 cũ: preflight/build/instrument/inspect trên đủ4 cell,30 phút/cell,
+artifact3 ngày, CI nền cùng HEAD. Phải đọc actual final tracing/annotation graph, Trace
+class và3 member trong target DEX, canary/R8,5 tests/20 metrics/JNI/KAT thật, lint XML,
+page/ABI/heap/memory, APK isolation/signing và SBOM/vulnerability/license. Metadata
+positive/negative PASS chỉ chứng minh admission scope; không thay bằng chứng build/runtime.
+
+Nếu checksum mới, non-tracing graph/toolchain drift, blocker khác hay cần file ngoài3
+path: DỪNG, giữ raw report và xin quyết định riêng. Không force/exclude/đổi dependency,
+keep/runner/wiring hay hạ security/test gate để đi tiếp. API26 clear-logcat, permission
+nội bộ, apksigner/aapt và license collector vẫn ngoài P09. Chưa tới gate là NOT-VERIFIED;
+failure phải giữ FAIL, không suy từ P07/P08 hay CI nền. QA kiểm toán độc lập trước Leader
+nghiệm thu. PR17/18 Draft, không Ready/merge/tag/release/T20 production; ARM64 thực,
+ARM64-16KiB thực và native OOM OPEN.

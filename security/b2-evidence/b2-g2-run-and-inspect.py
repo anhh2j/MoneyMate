@@ -54,6 +54,16 @@ APPROVED_CHECKSUMS = [
     ("org.jetbrains.kotlin:kotlin-stdlib-common:2.4.21", "kotlin-stdlib-common-2.4.21.module",
      "aeae4f24688e1dd7ebee648ab2b12be685cbe33e9c72bc1439730a794d6e2d5b"),
 ]
+# G2-P09: PO6360301889; preserve the previous eleven admitted additions unchanged.
+P09_CHECKSUM = ('androidx.annotation:annotation:1.2.0', 'annotation-1.2.0.module',
+                '2efcab81ef91b211bacd206eaacd995a51f633a2e96b57a8fc00144c5f9c56b3')
+P09_METADATA_BLOCK = (
+    '      <component group="androidx.annotation" name="annotation" version="1.2.0">\n'
+    '         <artifact name="annotation-1.2.0.module">\n'
+    '            <sha256 value="' + P09_CHECKSUM[2] + '" origin="G2-P09 verified upstream bytes"/>\n'
+    '         </artifact>\n'
+    '      </component>\n'
+).encode()
 PATHS = [
     'security/b2-g2/settings.gradle.kts',
     'security/b2-g2/build.gradle.kts',
@@ -75,7 +85,7 @@ def sha(raw):
 
 
 def approved_metadata():
-    """Preserve every baseline byte; insert only ten P01 and one P03 exact records."""
+    """Reconstruct exact 795 approved bytes, then insert the sole P09 record."""
     text = subprocess.check_output(
         ['git', 'show', ACCEPTED_B2 + ':gradle/verification-metadata.xml'], cwd=ROOT,
     ).decode()
@@ -96,12 +106,13 @@ def approved_metadata():
         else:
             block = opening + '\n' + block + '      </component>\n'
             text = text.replace('   </components>', block + '   </components>')
-    return text.encode()
+    assert text.count('   </components>') == 1
+    return text.encode().replace(b'   </components>', P09_METADATA_BLOCK + b'   </components>', 1)
 
 
 def verify_metadata(raw):
     assert len(APPROVED_CHECKSUMS) == 11 and len(set(APPROVED_CHECKSUMS)) == 11
-    assert raw == approved_metadata(), 'STOP: metadata differs from baseline plus exact ten P01 and one P03 additions'
+    assert raw == approved_metadata(), 'STOP: metadata differs from exact 795 approved records plus sole P09 record'
 
 
 def approved_catalog():
@@ -174,6 +185,7 @@ def verify_scope(changes):
 
 
 def guard_negative_controls(metadata):
+    verify_metadata(metadata)
     rows = ['A\t' + path for path in PATHS]
     verify_scope(rows)
     checks = [
@@ -187,6 +199,15 @@ def guard_negative_controls(metadata):
         ('p01-hash-change', verify_metadata, metadata.replace(APPROVED_CHECKSUMS[0][2].encode(), b'0' * 64)),
         ('unapproved-component', verify_metadata,
          metadata.replace(b'   </components>', b'      <component group="synthetic" name="unapproved" version="1"/>\n   </components>')),
+        ('p09-missing', verify_metadata, metadata.replace(P09_METADATA_BLOCK, b'')),
+        ('p09-hash-change', verify_metadata, metadata.replace(P09_CHECKSUM[2].encode(), b'0' * 64)),
+        ('p09-artifact-renamed', verify_metadata, metadata.replace(b'annotation-1.2.0.module', b'annotation-1.2.0.jar')),
+        ('p09-coordinate-version', verify_metadata, metadata.replace(
+            b'name="annotation" version="1.2.0"', b'name="annotation" version="1.2.1"')),
+        ('p09-duplicate', verify_metadata, metadata.replace(P09_METADATA_BLOCK, P09_METADATA_BLOCK * 2)),
+        ('p09-extra-hash', verify_metadata, metadata.replace(
+            P09_METADATA_BLOCK, P09_METADATA_BLOCK.replace(b'         </artifact>',
+                b'            <sha256 value="' + b'0' * 64 + b'"/>\n         </artifact>'))),
     ]
     results = []
     for name, guard, value in checks:
@@ -196,7 +217,8 @@ def guard_negative_controls(metadata):
             results.append({'case': name, 'result': 'REJECTED'})
         else:
             raise AssertionError('Guard accepted negative control: ' + name)
-    write_json('p04-negative-controls.json', {'status': 'PASS', 'controls': results, 'sourceFilesMutated': False})
+    write_json('p04-negative-controls.json', {'status': 'PASS', 'controls': results, 'sourceFilesMutated': False,
+                                            'positiveMetadata': 'ACCEPTED_EXACT_796', 'p09Authority': 'Issue16 comment6360301889'})
 
 
 def preflight():
@@ -217,8 +239,9 @@ def preflight():
     verify_metadata(metadata)
     guard_negative_controls(metadata)
     p08_negative_controls()
-    write_json('checksum-policy.json', {'baselineArtifactRecords': 784, 'approvedAdditions': APPROVED_CHECKSUMS,
-                                       'p01Additions': 10, 'p03Additions': 1, 'totalArtifactRecords': 795,
+    write_json('checksum-policy.json', {'baselineArtifactRecords': 784, 'approvedAdditions': APPROVED_CHECKSUMS + [P09_CHECKSUM],
+                                       'p01Additions': 10, 'p03Additions': 1, 'p09Additions': 1, 'totalArtifactRecords': 796,
+                                       'p09Authority': 'Issue16 comment6360301889',
                                        'metadataSha256': sha(metadata), 'strictVerification': True})
     command('java', ['java', '-version'])
     catalog = command('sdk-list', ['sdkmanager', '--list']).stdout
